@@ -13,6 +13,8 @@ func InitializeDatabase() {
 	var adminCount int64
 	config.DB.Model(&models.Utilizador{}).Where("email = ?", "admin@rls.pt").Count(&adminCount)
 
+	var adminID uint
+
 	if adminCount == 0 {
 		log.Println("Criando usuário administrador padrão")
 
@@ -32,7 +34,18 @@ func InitializeDatabase() {
 			log.Printf("Erro ao criar usuário administrador: %v", err)
 		} else {
 			log.Println("Usuário administrador criado com sucesso")
+			adminID = admin.ID
 		}
+	} else {
+		// Obter ID do admin existente
+		var admin models.Utilizador
+		config.DB.Where("email = ?", "admin@rls.pt").First(&admin)
+		adminID = admin.ID
+	}
+
+	// Inicializar preferências padrão para o administrador
+	if adminID > 0 {
+		initializeAdminPreferences(adminID)
 	}
 
 	// Inicializar permissões básicas do sistema
@@ -40,6 +53,28 @@ func InitializeDatabase() {
 
 	// Inicializar algumas configurações do sistema
 	initializeSystemConfigs()
+}
+
+// initializeAdminPreferences inicializa as preferências padrão para o administrador
+func initializeAdminPreferences(adminID uint) {
+	var prefsCount int64
+	config.DB.Model(&models.PreferenciasUtilizador{}).Where("utilizador_id = ?", adminID).Count(&prefsCount)
+
+	if prefsCount == 0 {
+		prefs := models.PreferenciasUtilizador{
+			UtilizadorID: adminID,
+			TemaEscuro:   false,
+			Idioma:       "pt",
+			Notificacoes: true,
+			Dashboard:    "{}",
+		}
+
+		if err := config.DB.Create(&prefs).Error; err != nil {
+			log.Printf("Erro ao criar preferências para o administrador: %v", err)
+		} else {
+			log.Println("Preferências do administrador criadas com sucesso")
+		}
+	}
 }
 
 // initializePermissions inicializa as permissões básicas do sistema
@@ -50,6 +85,10 @@ func initializePermissions() {
 		{Nome: "Ver Logs Auditoria", Descricao: "Visualizar logs de auditoria", Modulo: "Auditoria", Acao: "Visualizar"},
 		{Nome: "Gerir Configurações", Descricao: "Gerenciar configurações do sistema", Modulo: "Configurações", Acao: "Gerenciar"},
 		{Nome: "Gerir Permissões", Descricao: "Gerenciar permissões e perfis", Modulo: "Permissões", Acao: "Gerenciar"},
+		// Novas permissões para os novos recursos
+		{Nome: "Ver Utilizadores Ativos", Descricao: "Visualizar utilizadores ativos no sistema", Modulo: "Status", Acao: "Visualizar"},
+		{Nome: "Gerir Sessões", Descricao: "Gerenciar sessões de utilizadores", Modulo: "Sessões", Acao: "Gerenciar"},
+		{Nome: "Ver Preferências", Descricao: "Visualizar preferências de utilizadores", Modulo: "Preferências", Acao: "Visualizar"},
 	}
 
 	// Criar permissões se não existirem
@@ -92,6 +131,10 @@ func initializeSystemConfigs() {
 		{Chave: "app_name", Valor: "EDP Gestão de Utilizadores", Descricao: "Nome da aplicação"},
 		{Chave: "max_login_attempts", Valor: "5", Descricao: "Número máximo de tentativas de login"},
 		{Chave: "session_timeout", Valor: "30", Descricao: "Tempo de inatividade para encerramento da sessão (minutos)"},
+		// Novas configurações para os novos recursos
+		{Chave: "user_activity_timeout", Valor: "15", Descricao: "Tempo em minutos para considerar um utilizador inativo"},
+		{Chave: "tema_padrao", Valor: "claro", Descricao: "Tema padrão do sistema (claro/escuro)"},
+		{Chave: "idioma_padrao", Valor: "pt", Descricao: "Idioma padrão do sistema"},
 	}
 
 	for _, cfg := range configs {

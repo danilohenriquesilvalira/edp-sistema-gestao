@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/danilo/edp_gestao_utilizadores/internal/config"
+	"github.com/danilo/edp_gestao_utilizadores/internal/models"
 	"github.com/danilo/edp_gestao_utilizadores/internal/routes"
 	"github.com/danilo/edp_gestao_utilizadores/internal/tasks"
 	"github.com/danilo/edp_gestao_utilizadores/internal/utils"
@@ -24,6 +25,18 @@ func main() {
 	// Inicializar conexões de banco de dados
 	config.InitDatabase()
 	config.InitRedis()
+
+	// Migrar esquema do banco de dados para incluir as novas tabelas
+	err := config.DB.AutoMigrate(
+		&models.StatusUtilizador{},
+		&models.PreferenciasUtilizador{},
+	)
+
+	if err != nil {
+		log.Printf("Aviso: erro na migração do banco de dados: %v", err)
+	} else {
+		log.Println("Esquema do banco de dados migrado com sucesso")
+	}
 
 	// Inicializar configurações básicas
 	utils.InitializeDatabase()

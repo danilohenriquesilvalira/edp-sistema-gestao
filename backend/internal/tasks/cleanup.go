@@ -37,6 +37,17 @@ func CleanupUnusedTokens() {
 	}
 }
 
+// CleanupInactiveUsers marca como offline utilizadores inativos
+func CleanupInactiveUsers() {
+	timeoutMinutes := 15 // Considerar offline após 15 minutos de inatividade
+
+	if err := models.LimparStatusOffline(timeoutMinutes); err != nil {
+		log.Printf("Erro ao limpar status de utilizadores inativos: %v", err)
+	} else {
+		log.Println("Status de utilizadores inativos atualizado com sucesso")
+	}
+}
+
 // StartCleanupTasks inicia as tarefas de limpeza periódicas
 func StartCleanupTasks() {
 	// Executar as tarefas imediatamente uma vez
@@ -78,6 +89,7 @@ func RunCleanupTasks() {
 
 	CleanupExpiredSessions()
 	CleanupUnusedTokens()
+	CleanupInactiveUsers() // Nova tarefa
 
 	log.Println("Tarefas de limpeza concluídas com sucesso")
 }

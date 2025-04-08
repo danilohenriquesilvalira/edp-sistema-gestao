@@ -149,6 +149,14 @@ func Login(c *fiber.Ctx) error {
 	// Salvar refresh token no Redis (se disponível)
 	config.SaveRefreshToken(user.ID, sessionID, refreshToken, time.Until(refreshExpiry))
 
+	// Atualizar status do utilizador como online
+	models.AtualizarStatusUtilizador(
+		user.ID,
+		true,
+		c.IP(),
+		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
+	)
+
 	// Retornar resposta
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso": true,
@@ -257,6 +265,14 @@ func RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
+	// Atualizar status do utilizador como online
+	models.AtualizarStatusUtilizador(
+		userID,
+		true,
+		c.IP(),
+		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
+	)
+
 	// Retornar resposta
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso": true,
@@ -345,6 +361,14 @@ func Logout(c *fiber.Ctx) error {
 			},
 		)
 	}
+
+	// Atualizar status do utilizador como offline
+	models.AtualizarStatusUtilizador(
+		userID,
+		false,
+		c.IP(),
+		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
+	)
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso":  true,

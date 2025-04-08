@@ -20,6 +20,9 @@ func SetupRoutes(app *fiber.App) {
 	// Rotas protegidas (requerem autenticação)
 	protected := api.Group("/", middleware.AuthMiddleware())
 
+	// Aplicar middleware de rastreamento de atividade a todas as rotas protegidas
+	protected.Use(middleware.ActivityTrackingMiddleware())
+
 	// Rotas de utilizadores
 	SetupUserRoutes(protected.Group("/utilizadores"))
 
@@ -31,6 +34,11 @@ func SetupRoutes(app *fiber.App) {
 
 	// Rotas de permissões
 	SetupPermissionRoutes(protected.Group("/permissoes"))
+
+	// Novas rotas
+	SetupStatusRoutes(protected.Group("/status"))
+	SetupPreferencesRoutes(protected.Group("/preferencias"))
+	SetupSessionRoutes(protected.Group("/sessoes"))
 }
 
 // SetupAuthRoutes configura as rotas de autenticação
@@ -103,4 +111,35 @@ func SetupPermissionRoutes(router fiber.Router) {
 	// Rotas de perfil e permissões
 	router.Get("/perfil/:perfil", controllers.GetProfilePermissions)
 	router.Put("/perfil/:perfil", controllers.SetProfilePermissions)
+}
+
+// SetupStatusRoutes configura as rotas de status de utilizadores
+func SetupStatusRoutes(router fiber.Router) {
+	// Rota para atualizar o status do próprio utilizador (heartbeat)
+	router.Post("/heartbeat", controllers.UpdateUserStatus)
+
+	// Rotas que requerem permissão de administrador
+	adminRouter := router.Group("/", middleware.AdminOnlyMiddleware())
+
+	adminRouter.Get("/ativos", controllers.GetActiveUsers)
+	adminRouter.Get("/:id", controllers.GetUserStatus)
+}
+
+// SetupPreferencesRoutes configura as rotas de preferências
+func SetupPreferencesRoutes(router fiber.Router) {
+	// Rotas para o próprio utilizador
+	router.Get("/", controllers.GetUserPreferences)
+	router.Put("/", controllers.UpdateUserPreferences)
+
+	// Rotas que requerem permissão de administrador
+	adminRouter := router.Group("/", middleware.AdminOnlyMiddleware())
+	adminRouter.Get("/:id", controllers.GetUserPreferencesByID)
+}
+
+// SetupSessionRoutes configura as rotas de sessões
+func SetupSessionRoutes(router fiber.Router) {
+	// Obter sessões e encerrar sessões
+	router.Get("/:id", controllers.GetUserSessions)
+	router.Delete("/:id", controllers.TerminateSession)
+	router.Delete("/utilizador/:id", controllers.TerminateAllUserSessions)
 }
