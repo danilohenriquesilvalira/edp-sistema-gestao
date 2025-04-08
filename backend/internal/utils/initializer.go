@@ -15,16 +15,25 @@ func InitializeDatabase() {
 
 	var adminID uint
 
+	// Senha admin123 para testes
+	senhaAdmin := "admin123"
+
+	// Gerar hash da senha diretamente em vez de usar um hash fixo
+	adminHash, err := HashPassword(senhaAdmin)
+	if err != nil {
+		log.Printf("Erro ao gerar hash de senha: %v", err)
+		return
+	}
+
+	log.Printf("Hash gerado para 'admin123': %s", adminHash)
+
 	if adminCount == 0 {
 		log.Println("Criando usuário administrador padrão")
-
-		// Hash validado para a senha "admin123"
-		adminHash := "$argon2id$v=19$m=65536,t=1,p=4$MTIzNDU2Nzg5MDEyMzQ1Ng$KPbx7DYJ9J4Z1TA2dJZ5qEWGHKBHCQ5kk4Yx/9jxiM4"
 
 		admin := models.Utilizador{
 			Nome:             "Administrador",
 			Email:            "admin@rls.pt",
-			SenhaHash:        adminHash,
+			SenhaHash:        adminHash, // Usando o hash recém-gerado
 			Perfil:           "Administrador",
 			Estado:           "Ativo",
 			DoisFatoresAtivo: false,
@@ -35,12 +44,30 @@ func InitializeDatabase() {
 		} else {
 			log.Println("Usuário administrador criado com sucesso")
 			adminID = admin.ID
+
+			// Teste de verificação da senha para confirmar que funciona
+			senhaValida := VerifyPassword(senhaAdmin, adminHash)
+			log.Printf("Verificação de senha para 'admin123': %v", senhaValida)
 		}
 	} else {
-		// Obter ID do admin existente
+		// Atualizar a senha do administrador existente para garantir acesso
 		var admin models.Utilizador
 		config.DB.Where("email = ?", "admin@rls.pt").First(&admin)
 		adminID = admin.ID
+
+		// Atualizar senha e resetar tentativas de login
+		admin.SenhaHash = adminHash
+		admin.TentativasLogin = 0
+
+		if err := config.DB.Save(&admin).Error; err != nil {
+			log.Printf("Erro ao atualizar senha do administrador: %v", err)
+		} else {
+			log.Println("Senha do administrador atualizada com sucesso")
+
+			// Teste de verificação da senha para confirmar que funciona
+			senhaValida := VerifyPassword(senhaAdmin, adminHash)
+			log.Printf("Verificação de senha para 'admin123': %v", senhaValida)
+		}
 	}
 
 	// Inicializar preferências padrão para o administrador
