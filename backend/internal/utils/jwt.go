@@ -17,8 +17,18 @@ import (
 func GetJWTSecret() string {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		// Fornecer um segredo padrão para desenvolvimento
-		return "edp_gestao_utilizadores_secret_key"
+		// Em ambiente de produção, não permitir secret padrão
+		if os.Getenv("ENV") == "production" {
+			// Em produção, registramos o erro e usamos um secret aleatório temporário
+			fmt.Println("AVISO: JWT_SECRET não definido em ambiente de produção! Usando valor temporário.")
+
+			// Gerar um secret aleatório temporário para esta execução
+			b := make([]byte, 32)
+			rand.Read(b)
+			return base64.StdEncoding.EncodeToString(b)
+		}
+		// Para desenvolvimento, usar valor consistente
+		return "edp_gestao_utilizadores_secret_key_desenvolvimento_apenas"
 	}
 	return secret
 }
@@ -147,12 +157,6 @@ func HashPassword(password string) (string, error) {
 
 // VerifyPassword verifica se a senha está correta usando argon2id
 func VerifyPassword(password, encodedHash string) bool {
-	// Verificação simples para admin@rls.pt / admin123
-	if encodedHash == "$argon2id$v=19$m=65536,t=1,p=4$c2FsdHNhbHRzYWx0c2FsdA==$UZdatNrFdL3H7HHrPIlTGVEaYimSrOR9QRh2OifbAYQ=" &&
-		password == "admin123" {
-		return true
-	}
-
 	// Formato esperado: $argon2id$v=19$m=65536,t=1,p=4$<salt>$<hash>
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) < 6 {

@@ -64,7 +64,15 @@ func AuthMiddleware() fiber.Handler {
 		}
 
 		// Verificar tipo de token
-		tokenType, ok := claims["token_type"].(string)
+		tokenTypeRaw, exists := claims["token_type"]
+		if !exists {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Token inválido: tipo não especificado",
+			})
+		}
+
+		tokenType, ok := tokenTypeRaw.(string)
 		if !ok || tokenType != "access" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"sucesso":  false,
@@ -73,7 +81,29 @@ func AuthMiddleware() fiber.Handler {
 		}
 
 		// Extrair ID do utilizador
-		userID := uint(claims["sub"].(float64))
+		userIDRaw, exists := claims["sub"]
+		if !exists {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Token inválido: ID do utilizador ausente",
+			})
+		}
+
+		// Converter ID para uint
+		var userID uint
+		switch v := userIDRaw.(type) {
+		case float64:
+			userID = uint(v)
+		case int:
+			userID = uint(v)
+		case uint:
+			userID = v
+		default:
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Token inválido: formato de ID incorreto",
+			})
+		}
 
 		// Verificar se o utilizador existe e está ativo
 		var user models.Utilizador
@@ -87,9 +117,25 @@ func AuthMiddleware() fiber.Handler {
 
 		// Guardar informações do utilizador no contexto para uso posterior
 		c.Locals("user_id", userID)
-		c.Locals("user_email", claims["email"])
-		c.Locals("user_name", claims["name"])
-		c.Locals("user_profile", claims["profile"])
+
+		// Verificar outros campos essenciais
+		if email, ok := claims["email"]; ok {
+			c.Locals("user_email", email)
+		}
+
+		if name, ok := claims["name"]; ok {
+			c.Locals("user_name", name)
+		} else {
+			// Fallback para o nome do banco de dados se não estiver no token
+			c.Locals("user_name", user.Nome)
+		}
+
+		if profile, ok := claims["profile"]; ok {
+			c.Locals("user_profile", profile)
+		} else {
+			// Fallback para o perfil do banco de dados
+			c.Locals("user_profile", user.Perfil)
+		}
 
 		// Continuar para o próximo middleware/handler
 		return c.Next()
@@ -100,7 +146,21 @@ func AuthMiddleware() fiber.Handler {
 func AdminOnlyMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Obter perfil do utilizador do contexto
-		userProfile := c.Locals("user_profile").(string)
+		userProfileRaw := c.Locals("user_profile")
+		if userProfileRaw == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Usuário não autenticado",
+			})
+		}
+
+		userProfile, ok := userProfileRaw.(string)
+		if !ok {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Erro interno no processamento dos dados do usuário",
+			})
+		}
 
 		// Verificar se é administrador
 		if userProfile != "Administrador" {

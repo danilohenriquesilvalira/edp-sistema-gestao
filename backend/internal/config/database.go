@@ -19,9 +19,17 @@ func InitDatabase() {
 	// Obter variáveis de ambiente para conexão com o banco
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "danilo")
-	dbPass := getEnv("DB_PASS", "Danilo@34333528")
+	dbUser := getEnv("DB_USER", "postgres") // Valor genérico
+	dbPass := getEnv("DB_PASS", "postgres") // Valor genérico
 	dbName := getEnv("DB_NAME", "edp_gestao_utilizadores")
+
+	// Verificar se estamos em produção
+	if os.Getenv("ENV") == "production" {
+		// Verificar se as credenciais foram sobrescritas em produção
+		if os.Getenv("DB_USER") == "" || os.Getenv("DB_PASS") == "" {
+			log.Println("AVISO: Credenciais de banco de dados não configuradas em ambiente de produção!")
+		}
+	}
 
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=Europe/Lisbon",
 		dbHost, dbPort, dbUser, dbPass, dbName)

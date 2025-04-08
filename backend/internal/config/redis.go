@@ -11,6 +11,7 @@ import (
 
 var RedisClient *redis.Client
 var ctx = context.Background()
+var redisAvailable = false
 
 // InitRedis inicializa a conexão com o Redis
 func InitRedis() {
@@ -22,9 +23,12 @@ func InitRedis() {
 
 	// Criar cliente Redis
 	RedisClient = redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
-		Password: redisPass,
-		DB:       redisDB,
+		Addr:         fmt.Sprintf("%s:%s", redisHost, redisPort),
+		Password:     redisPass,
+		DB:           redisDB,
+		DialTimeout:  2 * time.Second, // Timeout reduzido para verificação mais rápida
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
 	})
 
 	// Verificar conexão
@@ -32,9 +36,12 @@ func InitRedis() {
 	if err != nil {
 		log.Printf("Aviso: Falha ao conectar ao Redis: %v", err)
 		log.Println("O sistema continuará a funcionar, mas os refresh tokens serão armazenados apenas no banco de dados.")
+		RedisClient = nil
+		redisAvailable = false
 		return
 	}
 
+	redisAvailable = true
 	log.Println("Conexão com o Redis estabelecida com sucesso")
 }
 
@@ -43,10 +50,15 @@ func GetRedisClient() *redis.Client {
 	return RedisClient
 }
 
+// IsRedisAvailable verifica se o Redis está disponível
+func IsRedisAvailable() bool {
+	return redisAvailable && RedisClient != nil
+}
+
 // SaveRefreshToken salva um token de atualização no Redis
 func SaveRefreshToken(userId uint, tokenId string, token string, expiresIn time.Duration) error {
 	// Se o Redis não estiver disponível, apenas retornar sem erro
-	if RedisClient == nil {
+	if !IsRedisAvailable() {
 		log.Println("Redis não disponível, token será armazenado apenas no banco de dados")
 		return nil
 	}
@@ -56,7 +68,8 @@ func SaveRefreshToken(userId uint, tokenId string, token string, expiresIn time.
 
 	err := RedisClient.Set(ctx, key, token, expiresIn).Err()
 	if err != nil {
-		return fmt.Errorf("erro ao salvar refresh token no Redis: %v", err)
+		log.Printf("Erro ao salvar refresh token no Redis: %v", err)
+		return nil // Não propagar erro para permitir fallback para banco
 	}
 
 	return nil
@@ -65,7 +78,7 @@ func SaveRefreshToken(userId uint, tokenId string, token string, expiresIn time.
 // GetRefreshToken recupera um token de atualização do Redis
 func GetRefreshToken(userId uint, tokenId string) (string, error) {
 	// Se o Redis não estiver disponível, retornar erro
-	if RedisClient == nil {
+	if !IsRedisAvailable() {
 		return "", fmt.Errorf("Redis não disponível")
 	}
 
@@ -84,7 +97,7 @@ func GetRefreshToken(userId uint, tokenId string) (string, error) {
 // DeleteRefreshToken remove um token de atualização do Redis
 func DeleteRefreshToken(userId uint, tokenId string) error {
 	// Se o Redis não estiver disponível, apenas retornar sem erro
-	if RedisClient == nil {
+	if !IsRedisAvailable() {
 		return nil
 	}
 
@@ -92,7 +105,8 @@ func DeleteRefreshToken(userId uint, tokenId string) error {
 
 	_, err := RedisClient.Del(ctx, key).Result()
 	if err != nil {
-		return fmt.Errorf("erro ao remover refresh token do Redis: %v", err)
+		log.Printf("Erro ao remover refresh token do Redis: %v", err)
+		return nil // Não propagar erro para continuar o fluxo
 	}
 
 	return nil
@@ -101,7 +115,7 @@ func DeleteRefreshToken(userId uint, tokenId string) error {
 // DeleteAllUserRefreshTokens remove todos os tokens de atualização de um utilizador
 func DeleteAllUserRefreshTokens(userId uint) error {
 	// Se o Redis não estiver disponível, apenas retornar sem erro
-	if RedisClient == nil {
+	if !IsRedisAvailable() {
 		return nil
 	}
 
@@ -110,12 +124,14 @@ func DeleteAllUserRefreshTokens(userId uint) error {
 	iter := RedisClient.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		if err := RedisClient.Del(ctx, iter.Val()).Err(); err != nil {
-			return fmt.Errorf("erro ao remover tokens do Redis: %v", err)
+			log.Printf("Erro ao remover token %s: %v", iter.Val(), err)
+			// Continuar mesmo com erro
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		return fmt.Errorf("erro na iteração do Redis: %v", err)
+		log.Printf("Erro na iteração do Redis: %v", err)
+		return nil // Não propagar erro para continuar o fluxo
 	}
 
 	return nil

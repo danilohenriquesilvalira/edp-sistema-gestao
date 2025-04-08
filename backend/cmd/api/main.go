@@ -18,8 +18,11 @@ import (
 
 func main() {
 	// Carregar variáveis de ambiente
-	if err := godotenv.Load(); err != nil {
-		log.Println("Aviso: Arquivo .env não encontrado")
+	if err := godotenv.Load("../../.env"); err != nil {
+		// Tentar carregar o .env na raiz do projeto
+		if err := godotenv.Load(); err != nil {
+			log.Println("Aviso: Arquivo .env não encontrado. Usando valores padrão.")
+		}
 	}
 
 	// Inicializar conexões de banco de dados

@@ -118,14 +118,33 @@ func Login(c *fiber.Ctx) error {
 
 	// Extrair informações do refresh token para obter o token ID
 	claims := jwt.MapClaims{}
-	_, _ = jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(utils.GetJWTSecret()), nil
 	})
 
-	// Obter token ID das claims (session ID gerado na função GenerateRefreshToken)
-	var sessionID string
-	if sessionIDClaim, ok := claims["session_id"].(string); ok {
-		sessionID = sessionIDClaim
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao processar token",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Obter token ID das claims com verificação adequada
+	sessionIDRaw, exists := claims["session_id"]
+	if !exists {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro na geração do token: ID de sessão ausente",
+		})
+	}
+
+	sessionID, ok := sessionIDRaw.(string)
+	if !ok || sessionID == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro na geração do token: formato de ID inválido",
+		})
 	}
 
 	// Criar sessão
@@ -147,15 +166,20 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	// Salvar refresh token no Redis (se disponível)
+	// Usar a função atualizada que não retorna erro mesmo se Redis não estiver disponível
 	config.SaveRefreshToken(user.ID, sessionID, refreshToken, time.Until(refreshExpiry))
 
 	// Atualizar status do utilizador como online
-	models.AtualizarStatusUtilizador(
+	if err := models.AtualizarStatusUtilizador(
 		user.ID,
 		true,
 		c.IP(),
 		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
-	)
+	); err != nil {
+		// Apenas logar o erro, não falhar o login
+		// (log em ambiente de produção)
+		// log.Printf("Erro ao atualizar status do utilizador: %v", err)
+	}
 
 	// Retornar resposta
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -210,13 +234,45 @@ func RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extrair ID do utilizador e ID da sessão
-	userID := uint(claims["sub"].(float64))
-	sessionID, ok := claims["session_id"].(string)
-	if !ok || sessionID == "" {
+	// Extrair ID do utilizador com verificação adequada
+	userIDRaw, exists := claims["sub"]
+	if !exists {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Token inválido: ID do utilizador ausente",
+		})
+	}
+
+	// Converter ID para uint com tratamento de tipos
+	var userID uint
+	switch v := userIDRaw.(type) {
+	case float64:
+		userID = uint(v)
+	case int:
+		userID = uint(v)
+	case uint:
+		userID = v
+	default:
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Token inválido: formato de ID incorreto",
+		})
+	}
+
+	// Extrair ID da sessão com verificação adequada
+	sessionIDRaw, exists := claims["session_id"]
+	if !exists {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"sucesso":  false,
 			"mensagem": "Token inválido: ID de sessão ausente",
+		})
+	}
+
+	sessionID, ok := sessionIDRaw.(string)
+	if !ok || sessionID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Token inválido: formato de ID de sessão incorreto",
 		})
 	}
 
@@ -266,12 +322,15 @@ func RefreshToken(c *fiber.Ctx) error {
 	}
 
 	// Atualizar status do utilizador como online
-	models.AtualizarStatusUtilizador(
+	if err := models.AtualizarStatusUtilizador(
 		userID,
 		true,
 		c.IP(),
 		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
-	)
+	); err != nil {
+		// Apenas logar o erro, não falhar o refresh
+		// (log em ambiente de produção)
+	}
 
 	// Retornar resposta
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -294,7 +353,21 @@ func RefreshToken(c *fiber.Ctx) error {
 // Logout encerra a sessão do utilizador
 func Logout(c *fiber.Ctx) error {
 	// Obter ID do utilizador do contexto (definido pelo middleware de autenticação)
-	userID := c.Locals("user_id").(uint)
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
 
 	// Obter token de atualização do corpo da requisição
 	var req RefreshRequest
@@ -327,16 +400,25 @@ func Logout(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extrair ID da sessão
-	sessionID, ok := claims["session_id"].(string)
-	if !ok || sessionID == "" {
+	// Extrair ID da sessão com verificação adequada
+	sessionIDRaw, exists := claims["session_id"]
+	if !exists {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"sucesso":  false,
 			"mensagem": "Token inválido: ID de sessão ausente",
 		})
 	}
 
+	sessionID, ok := sessionIDRaw.(string)
+	if !ok || sessionID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Token inválido: formato de ID de sessão incorreto",
+		})
+	}
+
 	// Remover token do Redis (se disponível)
+	// Usar a função atualizada que não retorna erro mesmo se Redis não estiver disponível
 	config.DeleteRefreshToken(userID, sessionID)
 
 	// Buscar sessão pelo token em vez do ID
@@ -344,7 +426,10 @@ func Logout(c *fiber.Ctx) error {
 	if err == nil && session.UtilizadorID == userID {
 		// Invalidar sessão no banco de dados definindo a data de expiração para agora
 		session.ExpiraEm = time.Now()
-		config.DB.Save(&session)
+		if err := config.DB.Save(&session).Error; err != nil {
+			// Apenas logar o erro, não falhar o logout
+			// (log em ambiente de produção)
+		}
 	}
 
 	// Registrar log de auditoria
@@ -363,12 +448,15 @@ func Logout(c *fiber.Ctx) error {
 	}
 
 	// Atualizar status do utilizador como offline
-	models.AtualizarStatusUtilizador(
+	if err := models.AtualizarStatusUtilizador(
 		userID,
 		false,
 		c.IP(),
 		utils.ExtractDeviceInfo(string(c.Request().Header.UserAgent())),
-	)
+	); err != nil {
+		// Apenas logar o erro, não falhar o logout
+		// (log em ambiente de produção)
+	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso":  true,
@@ -378,7 +466,21 @@ func Logout(c *fiber.Ctx) error {
 
 // GetCurrentUser retorna os dados do utilizador atual
 func GetCurrentUser(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(uint)
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
 
 	user, err := models.GetUserByID(userID)
 	if err != nil {

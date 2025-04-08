@@ -36,16 +36,61 @@ type UpdateUserRequest struct {
 	DoisFatoresAtivo bool   `json:"dois_fatores_ativo"`
 }
 
-// GetAllUsers retorna todos os utilizadores
+// GetAllUsers retorna todos os utilizadores com paginação
 func GetAllUsers(c *fiber.Ctx) error {
-	var users []models.Utilizador
+	// Parâmetros de paginação
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
 
-	result := config.DB.Find(&users)
-	if result.Error != nil {
+	limit, err := strconv.Atoi(c.Query("limit", "20"))
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	offset := (page - 1) * limit
+
+	// Parâmetros de filtro
+	nome := c.Query("nome", "")
+	email := c.Query("email", "")
+	perfil := c.Query("perfil", "")
+	estado := c.Query("estado", "")
+
+	// Construir consulta
+	query := config.DB.Model(&models.Utilizador{})
+
+	// Aplicar filtros se fornecidos
+	if nome != "" {
+		query = query.Where("nome ILIKE ?", "%"+nome+"%")
+	}
+	if email != "" {
+		query = query.Where("email ILIKE ?", "%"+email+"%")
+	}
+	if perfil != "" {
+		query = query.Where("perfil = ?", perfil)
+	}
+	if estado != "" {
+		query = query.Where("estado = ?", estado)
+	}
+
+	// Contar total de registros
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao contar utilizadores",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Buscar registros com paginação
+	var users []models.Utilizador
+	if err := query.Order("id ASC").Offset(offset).Limit(limit).Find(&users).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"sucesso":  false,
 			"mensagem": "Erro ao obter utilizadores",
-			"erro":     result.Error.Error(),
+			"erro":     err.Error(),
 		})
 	}
 
@@ -62,10 +107,18 @@ func GetAllUsers(c *fiber.Ctx) error {
 		})
 	}
 
+	// Calcular total de páginas
+	totalPages := (int(total) + limit - 1) / limit
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso": true,
 		"dados":   responseUsers,
-		"total":   len(responseUsers),
+		"meta": fiber.Map{
+			"total":       total,
+			"page":        page,
+			"limit":       limit,
+			"total_pages": totalPages,
+		},
 	})
 }
 
@@ -124,6 +177,22 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validar campo Perfil
+	if req.Perfil != "Administrador" && req.Perfil != "Utilizador" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Perfil inválido. Deve ser 'Administrador' ou 'Utilizador'",
+		})
+	}
+
+	// Validar campo Estado
+	if req.Estado != "Ativo" && req.Estado != "Inativo" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Estado inválido. Deve ser 'Ativo' ou 'Inativo'",
+		})
+	}
+
 	// Gerar hash da senha
 	senhaHash, err := utils.HashPassword(req.Password)
 	if err != nil {
@@ -155,8 +224,22 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	// Registrar log de auditoria
-	adminID := c.Locals("user_id").(uint)
-	adminName := c.Locals("user_name").(string)
+	userIDValue := c.Locals("user_id")
+	adminID := uint(0)
+	adminName := "Sistema"
+
+	if userIDValue != nil {
+		if id, ok := userIDValue.(uint); ok {
+			adminID = id
+		}
+
+		userNameValue := c.Locals("user_name")
+		if userNameValue != nil {
+			if name, ok := userNameValue.(string); ok {
+				adminName = name
+			}
+		}
+	}
 
 	models.RegistrarAuditoria(
 		adminID,
@@ -236,10 +319,25 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if req.Perfil != "" {
+		// Validar Perfil
+		if req.Perfil != "Administrador" && req.Perfil != "Utilizador" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Perfil inválido. Deve ser 'Administrador' ou 'Utilizador'",
+			})
+		}
 		user.Perfil = req.Perfil
 	}
 
 	if req.Estado != "" {
+		// Validar Estado
+		if req.Estado != "Ativo" && req.Estado != "Inativo" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"sucesso":  false,
+				"mensagem": "Estado inválido. Deve ser 'Ativo' ou 'Inativo'",
+			})
+		}
+
 		user.Estado = req.Estado
 
 		// Se desativando a conta, invalidar todas as sessões
@@ -275,8 +373,37 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	// Registrar log de auditoria
-	adminID := c.Locals("user_id").(uint)
-	adminName := c.Locals("user_name").(string)
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
+
+	userNameValue := c.Locals("user_name")
+	if userNameValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminName, ok := userNameValue.(string)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento dos dados do usuário",
+		})
+	}
 
 	models.RegistrarAuditoria(
 		adminID,
@@ -329,7 +456,22 @@ func DeleteUser(c *fiber.Ctx) error {
 	}
 
 	// Impedir exclusão da própria conta
-	adminID := c.Locals("user_id").(uint)
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
+
 	if adminID == uint(id) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"sucesso":  false,
@@ -357,7 +499,21 @@ func DeleteUser(c *fiber.Ctx) error {
 	}
 
 	// Registrar log de auditoria
-	adminName := c.Locals("user_name").(string)
+	userNameValue := c.Locals("user_name")
+	if userNameValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminName, ok := userNameValue.(string)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento dos dados do usuário",
+		})
+	}
 
 	models.RegistrarAuditoria(
 		adminID,
@@ -378,7 +534,7 @@ func DeleteUser(c *fiber.Ctx) error {
 	})
 }
 
-// UploadProfilePicture faz o upload da foto de perfil de um utilizador
+// UploadProfilePicture faz o upload da foto de perfil de um utilizador com validação aprimorada
 func UploadProfilePicture(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -407,12 +563,45 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 		})
 	}
 
-	// Verificar tipo de arquivo (aceitar apenas imagens)
-	contentType := file.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "image/") {
+	// Verificar tamanho do arquivo (limite de 2MB)
+	const maxSize = 2 * 1024 * 1024 // 2MB
+	if file.Size > maxSize {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"sucesso":  false,
-			"mensagem": "O arquivo não é uma imagem válida",
+			"mensagem": "O arquivo excede o tamanho máximo permitido de 2MB",
+		})
+	}
+
+	// Verificar tipo de arquivo (aceitar apenas imagens)
+	contentType := file.Header.Get("Content-Type")
+	validTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/gif":  true,
+		"image/webp": true,
+	}
+
+	if !validTypes[contentType] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "O arquivo deve ser uma imagem (JPEG, PNG, GIF ou WebP)",
+		})
+	}
+
+	// Obter e validar extensão do arquivo
+	fileExt := strings.ToLower(filepath.Ext(file.Filename))
+	validExts := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".webp": true,
+	}
+
+	if !validExts[fileExt] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Extensão de arquivo inválida. Permitidas: JPG, JPEG, PNG, GIF, WebP",
 		})
 	}
 
@@ -426,15 +615,16 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 		})
 	}
 
-	// Gerar nome de arquivo único
-	fileExt := filepath.Ext(file.Filename)
-	fileName := fmt.Sprintf("user_%d_%d%s", id, time.Now().Unix(), fileExt)
-	filePath := filepath.Join(uploadDir, fileName)
+	// Gerar nome de arquivo seguro (evitar path traversal)
+	timestamp := time.Now().Unix()
+	safeFileName := fmt.Sprintf("user_%d_%d%s", id, timestamp, fileExt)
+	filePath := filepath.Join(uploadDir, safeFileName)
 
 	// Remover foto anterior, se existir
 	if user.FotoPerfil != "" && strings.HasPrefix(user.FotoPerfil, "/uploads/") {
 		oldFilePath := "." + user.FotoPerfil
-		os.Remove(oldFilePath)
+		// Ignorar erros na remoção do arquivo antigo
+		_ = os.Remove(oldFilePath)
 	}
 
 	// Salvar arquivo
@@ -447,7 +637,7 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 	}
 
 	// Atualizar caminho da foto no banco de dados
-	relativePath := "/uploads/avatars/" + fileName
+	relativePath := "/uploads/avatars/" + safeFileName
 	user.FotoPerfil = relativePath
 	if err := config.DB.Save(&user).Error; err != nil {
 		// Remover arquivo se houver erro ao atualizar o banco
@@ -461,8 +651,37 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 	}
 
 	// Registrar log de auditoria
-	adminID := c.Locals("user_id").(uint)
-	adminName := c.Locals("user_name").(string)
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
+
+	userNameValue := c.Locals("user_name")
+	if userNameValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	adminName, ok := userNameValue.(string)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento dos dados do usuário",
+		})
+	}
 
 	models.RegistrarAuditoria(
 		adminID,
@@ -486,7 +705,7 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 
 // Funções auxiliares
 
-// saveFile salva um arquivo no sistema de arquivos
+// saveFile salva um arquivo no sistema de arquivos de forma segura
 func saveFile(file *multipart.FileHeader, dst string) error {
 	src, err := file.Open()
 	if err != nil {
