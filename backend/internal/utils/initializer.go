@@ -18,8 +18,8 @@ func InitializeDatabase() {
 	if adminCount == 0 {
 		log.Println("Criando usuário administrador padrão")
 
-		// Hash da senha admin123 usando argon2id
-		adminHash := "$argon2id$v=19$m=65536,t=1,p=4$c2FsdHNhbHRzYWx0c2FsdA==$UZdatNrFdL3H7HHrPIlTGVEaYimSrOR9QRh2OifbAYQ="
+		// Hash validado para a senha "admin123"
+		adminHash := "$argon2id$v=19$m=65536,t=1,p=4$MTIzNDU2Nzg5MDEyMzQ1Ng$KPbx7DYJ9J4Z1TA2dJZ5qEWGHKBHCQ5kk4Yx/9jxiM4"
 
 		admin := models.Utilizador{
 			Nome:             "Administrador",
