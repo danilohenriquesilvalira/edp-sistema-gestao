@@ -38,15 +38,16 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     
     setLoading(true);
     try {
-      // Usando o método específico da API em vez de chamar diretamente
       const response = await api.getUserSessions(user.id, true);
       if (response.data.sucesso) {
-        setSessions(response.data.dados);
+        setSessions(response.data.dados || []);
+      } else {
+        setSessions([]);
       }
     } catch (error: unknown) {
       console.error('Erro ao carregar sessões:', error);
+      setSessions([]);
       
-      // Tratamento de erro mais detalhado
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         
@@ -77,7 +78,6 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
 
   const terminateSession = async (sessionId: number) => {
     try {
-      // Usando o método específico da API em vez de chamar diretamente
       const response = await api.terminateSession(sessionId);
       if (response.data.sucesso) {
         toast.success('Sessão encerrada com sucesso');
@@ -86,7 +86,6 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     } catch (error: unknown) {
       console.error('Erro ao encerrar sessão:', error);
       
-      // Tratamento de erro mais detalhado
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         
@@ -105,7 +104,6 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     if (!user) return;
     
     try {
-      // Usando o método específico da API em vez de chamar diretamente
       const response = await api.terminateAllUserSessions(user.id);
       if (response.data.sucesso) {
         toast.success('Todas as sessões encerradas com sucesso');
@@ -114,7 +112,6 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     } catch (error: unknown) {
       console.error('Erro ao encerrar todas as sessões:', error);
       
-      // Tratamento de erro mais detalhado
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         
@@ -175,7 +172,6 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
                   alt={user.nome} 
                   className="w-20 h-20 rounded-full object-cover"
                   onError={(e) => {
-                    // Fallback para a letra inicial
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     target.parentElement!.innerText = user.nome.charAt(0).toUpperCase();
@@ -278,7 +274,7 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-green-600"></div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Carregando sessões...</p>
                   </div>
-                ) : sessions.length === 0 ? (
+                ) : !sessions || sessions.length === 0 ? (
                   <div className="py-4 text-center text-gray-500 dark:text-gray-400">
                     <Clock size={24} className="mx-auto mb-2" />
                     <p>Nenhuma sessão ativa encontrada.</p>

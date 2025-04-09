@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+:root.dark {
+  --bg-primary: #070c14;
+  --bg-secondary: #0c1220;
+  --bg-tertiary: #111927;
+  --bg-elevated: #172032;
+  --border-subtle: #1f2c3f;
+  --text-primary: #f3f4f6;
+  --text-secondary: #b4c0d3;
+  --accent-blue: #0073e6;
+  --accent-blue-hover: #0086ff;
+  --card-bg: linear-gradient(145deg, #0a1525, #131f32);
+  --sidebar-bg: linear-gradient(180deg, #070c14 0%, #0c1525 100%);
+  --header-bg: rgba(7, 12, 20, 0.8);
+}
+
 @layer base {
   html {
     @apply text-gray-900;
@@ -15,7 +30,8 @@
   }
   
   .dark body {
-    @apply bg-gray-900 text-gray-100;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
 }
 
@@ -37,7 +53,13 @@
   }
   
   .dark .btn-outline {
-    @apply border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700;
+    border-color: var(--border-subtle);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  
+  .dark .btn-outline:hover {
+    background-color: var(--bg-tertiary);
   }
   
   .input {
@@ -45,7 +67,9 @@
   }
   
   .dark .input {
-    @apply bg-gray-800 border-gray-700 text-white;
+    background-color: var(--bg-secondary);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
   }
   
   .card {
@@ -53,7 +77,8 @@
   }
   
   .dark .card {
-    @apply bg-gray-800;
+    background: var(--card-bg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
   
   .table-container {
@@ -73,7 +98,7 @@
   }
   
   .dark .table th {
-    @apply text-gray-400;
+    color: var(--text-secondary);
   }
   
   .table td {
@@ -85,7 +110,7 @@
   }
   
   .dark .table tr {
-    @apply bg-gray-800;
+    background-color: var(--bg-secondary);
   }
   
   .table tr:nth-child(even) {
@@ -93,6 +118,58 @@
   }
   
   .dark .table tr:nth-child(even) {
-    @apply bg-gray-700;
+    background-color: var(--bg-tertiary);
   }
+}
+
+/* Sobrescritas para tema escuro */
+.dark .bg-gray-800 {
+  background-color: var(--bg-secondary) !important;
+}
+
+.dark .bg-gray-900 {
+  background-color: var(--bg-primary) !important;
+}
+
+.dark .bg-gray-700 {
+  background-color: var(--bg-tertiary) !important;
+}
+
+.dark .border-gray-700 {
+  border-color: var(--border-subtle) !important;
+}
+
+.dark .shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dark .text-gray-400 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-gray-300 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-gray-100, .dark .text-white {
+  color: var(--text-primary) !important;
+}
+
+/* Gradientes e animações para componentes */
+.dark .sidebar {
+  background: var(--sidebar-bg);
+}
+
+.dark .header {
+  background: var(--header-bg);
+  backdrop-filter: blur(8px);
+}
+
+.dark .btn-primary {
+  background: linear-gradient(to right, var(--accent-blue), #0052a3);
+  border: none;
+}
+
+.dark .btn-primary:hover {
+  background: linear-gradient(to right, var(--accent-blue-hover), #0060c0);
 }
