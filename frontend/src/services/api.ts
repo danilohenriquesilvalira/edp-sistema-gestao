@@ -297,6 +297,10 @@ class ApiService {
     });
   }
 
+  public async removeProfilePicture(id: number): Promise<AxiosResponse> {
+    return this.api.delete(`/api/utilizadores/${id}/avatar`);
+  }
+
   // PASSWORD
   public async forgotPassword(email: string): Promise<AxiosResponse> {
     return this.api.post('/api/password/forgot', { email });

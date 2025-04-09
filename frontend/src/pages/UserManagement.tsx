@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/services/api';
+import api, { getAvatarUrl } from '@/services/api';
 import { toast } from 'react-toastify';
 import { 
   Search, Plus, Edit, Trash2, Eye, Filter, X, Check, ChevronLeft, ChevronRight 
@@ -334,7 +334,17 @@ const UserManagement: React.FC = () => {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
                           {user.foto_perfil ? (
-                            <img className="h-10 w-10 rounded-full object-cover" src={user.foto_perfil} alt={user.nome} />
+                            <img 
+                              className="h-10 w-10 rounded-full object-cover" 
+                              src={getAvatarUrl(user.foto_perfil) || undefined} 
+                              alt={user.nome}
+                              onError={(e) => {
+                                // Fallback para a letra inicial
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.parentElement!.innerText = user.nome.charAt(0).toUpperCase();
+                              }}
+                            />
                           ) : (
                             <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center text-white">
                               {user.nome.charAt(0).toUpperCase()}

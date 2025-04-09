@@ -70,6 +70,7 @@ func SetupUserRoutes(router fiber.Router) {
 	adminRouter.Put("/:id", controllers.UpdateUser)
 	adminRouter.Delete("/:id", controllers.DeleteUser)
 	adminRouter.Post("/:id/avatar", controllers.UploadProfilePicture)
+	adminRouter.Delete("/:id/avatar", controllers.RemoveProfilePicture)
 }
 
 // SetupConfigRoutes configura as rotas de configurações do sistema

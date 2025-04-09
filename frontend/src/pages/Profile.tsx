@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
-import api from '@/services/api';
+import api, { getAvatarUrl } from '@/services/api';
 import { toast } from 'react-toastify';
 import { Eye, EyeOff, Upload, Check, X, RefreshCw, LogOut, Camera, Shield, Key, Bell, Palette, Globe } from 'lucide-react';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
@@ -43,6 +43,7 @@ const Profile: React.FC = () => {
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
   const [loadingAvatar, setLoadingAvatar] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -280,6 +281,28 @@ const Profile: React.FC = () => {
       setIsLogoutAllModalOpen(false);
     }
   };
+  
+  const handleRemoveAvatar = async () => {
+    if (!user) return;
+    setLoading(true);
+    
+    try {
+      const response = await api.removeProfilePicture(user.id);
+      
+      if (response.data.sucesso) {
+        toast.success('Foto de perfil removida com sucesso!');
+        // Recarregar página após 1.5 segundos
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Erro ao remover avatar:', error);
+      toast.error('Erro ao remover foto de perfil');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleImageError = () => {
     setImageError(true);
@@ -313,7 +336,7 @@ const Profile: React.FC = () => {
                     />
                   ) : user.foto_perfil && !imageError ? (
                     <img 
-                      src={user.foto_perfil} 
+                      src={getAvatarUrl(user.foto_perfil) || undefined} 
                       alt={user.nome}
                       className="w-full h-full object-cover"
                       onError={handleImageError}
@@ -362,6 +385,22 @@ const Profile: React.FC = () => {
                     Cancelar
                   </button>
                 </div>
+              )}
+              
+              {/* Botão para remover avatar existente */}
+              {!avatarPreview && user.foto_perfil && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  disabled={loading}
+                  className="mt-4 flex items-center justify-center px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-800/30 transition-colors"
+                >
+                  {loading ? (
+                    <RefreshCw size={16} className="animate-spin mr-2" />
+                  ) : (
+                    <X size={16} className="mr-2" />
+                  )}
+                  Remover foto
+                </button>
               )}
               
               <h2 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">{user.nome}</h2>
@@ -605,7 +644,7 @@ const Profile: React.FC = () => {
                             id="notificacoes"
                             name="notificacoes"
                             checked={preferences.notificacoes}
-                            onChange={handlePreferenceChange}
+onChange={handlePreferenceChange}
                             className="sr-only"
                           />
                           <div className={`w-11 h-6 bg-gray-300 rounded-full peer dark:bg-gray-600 ${preferences.notificacoes ? 'bg-edp-primary-purple dark:bg-edp-primary-blue' : ''}`}>

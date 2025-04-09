@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
+import { getAvatarUrl } from '@/services/api';
 import {
   Users,
   LayoutDashboard,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -21,6 +21,7 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -29,6 +30,10 @@ const MainLayout: React.FC = () => {
 
   const closeSidebar = () => {
     setSidebarOpen(false);
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
   };
 
   return (
@@ -40,8 +45,8 @@ const MainLayout: React.FC = () => {
 
       {/* Sidebar */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 overflow-y-auto transition-transform transform 
-                  ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 overflow-y-auto transition-transform transform
+                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
@@ -144,40 +149,67 @@ const MainLayout: React.FC = () => {
                 <div className="relative">
                   <button
                     className="flex items-center text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-none"
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    onClick={() => {
+                      setUserMenuOpen(!userMenuOpen);
+                      setImageError(false);
+                    }}
                   >
-                    <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center mr-2">
-                      {user?.nome.charAt(0).toUpperCase()}
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-green-600 flex items-center justify-center mr-2">
+                      {user?.foto_perfil && !imageError ? (
+                        <img
+                          src={getAvatarUrl(user.foto_perfil) || undefined}
+                          alt={user?.nome || ""}
+                          className="w-full h-full object-cover"
+                          onError={handleImageError}
+                        />
+                      ) : (
+                        <span className="text-white">{user?.nome.charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
                     <span className="hidden md:block">{user?.nome}</span>
                     <ChevronDown className="h-4 w-4 ml-1" />
                   </button>
+
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 py-2 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700">
                       <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-                        <div className="font-medium text-gray-800 dark:text-white">{user?.nome}</div>
-                        <div className="text-xs">{user?.email}</div>
+                        <div className="flex items-center mb-2">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-green-600 flex items-center justify-center mr-3">
+                            {user?.foto_perfil && !imageError ? (
+                              <img
+                                src={getAvatarUrl(user.foto_perfil) || undefined}
+                                alt={user?.nome || ""}
+                                className="w-full h-full object-cover"
+                                onError={handleImageError}
+                              />
+                            ) : (
+                              <span className="text-white">{user?.nome.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-800 dark:text-white">{user?.nome}</div>
+                            <div className="text-xs">{user?.email}</div>
+                          </div>
+                        </div>
                         <div className="text-xs mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                           {user?.perfil}
                         </div>
                       </div>
-                      <a
-                        href="/perfil"
+
+                      <NavLink
+                        to="/perfil"
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         Meu Perfil
-                      </a>
-                      <a
-                        href="#"
+                      </NavLink>
+
+                      <button
+                        onClick={handleLogout}
                         className="block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleLogout();
-                        }}
                       >
                         Sair
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>

@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -700,6 +701,66 @@ func UploadProfilePicture(c *fiber.Ctx) error {
 		"sucesso":     true,
 		"mensagem":    "Foto de perfil atualizada com sucesso",
 		"foto_perfil": relativePath,
+	})
+}
+
+// RemoveProfilePicture remove a foto de perfil de um utilizador
+func RemoveProfilePicture(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "ID inválido",
+		})
+	}
+
+	// Verificar se o utilizador existe
+	var user models.Utilizador
+	if err := config.DB.First(&user, id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Utilizador não encontrado",
+		})
+	}
+
+	// Remover foto de perfil, se existir
+	if user.FotoPerfil != "" && strings.HasPrefix(user.FotoPerfil, "/uploads/") {
+		oldFilePath := "." + user.FotoPerfil
+		if err := os.Remove(oldFilePath); err != nil {
+			// Apenas logamos o erro, não interrompemos o fluxo
+			log.Printf("Erro ao remover arquivo: %v", err)
+		}
+	}
+
+	// Atualizar banco de dados
+	user.FotoPerfil = ""
+	if err := config.DB.Save(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao atualizar utilizador",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Registrar log de auditoria
+	userID := c.Locals("user_id").(uint)
+	userName := c.Locals("user_name").(string)
+
+	models.RegistrarAuditoria(
+		userID,
+		userName,
+		"Remover Foto",
+		"Utilizadores",
+		c.IP(),
+		map[string]interface{}{
+			"id":   user.ID,
+			"nome": user.Nome,
+		},
+	)
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"sucesso":  true,
+		"mensagem": "Foto de perfil removida com sucesso",
 	})
 }
 

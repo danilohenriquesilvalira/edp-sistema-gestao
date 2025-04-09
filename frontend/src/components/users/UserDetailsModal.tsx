@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/services/api';
+import api, { getAvatarUrl } from '@/services/api';
 import { toast } from 'react-toastify';
 import { User } from '@/contexts/AuthContext';
 import { X, Edit, Shield, Clock, History } from 'lucide-react';
@@ -171,9 +171,15 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
             <div className="flex flex-col sm:flex-row items-center mb-6">
               {user.foto_perfil ? (
                 <img 
-                  src={user.foto_perfil} 
+                  src={getAvatarUrl(user.foto_perfil) || undefined}  
                   alt={user.nome} 
                   className="w-20 h-20 rounded-full object-cover"
+                  onError={(e) => {
+                    // Fallback para a letra inicial
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.innerText = user.nome.charAt(0).toUpperCase();
+                  }}
                 />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-green-600 flex items-center justify-center text-white text-2xl">
