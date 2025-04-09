@@ -171,7 +171,7 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
             <div className="flex flex-col sm:flex-row items-center mb-6">
               {user.foto_perfil ? (
                 <img 
-                  src={getAvatarUrl(user.foto_perfil) || undefined}  
+                  src={getAvatarUrl(user.foto_perfil) || undefined} 
                   alt={user.nome} 
                   className="w-20 h-20 rounded-full object-cover"
                   onError={(e) => {

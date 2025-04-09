@@ -12,7 +12,9 @@ import {
   Moon,
   Sun,
   ChevronDown,
-  User
+  User,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -20,6 +22,7 @@ const MainLayout: React.FC = () => {
   const { darkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -36,104 +39,151 @@ const MainLayout: React.FC = () => {
     setImageError(true);
   };
 
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const renderNavLinks = (collapsed: boolean) => (
+    <nav className={`mt-5 px-4 space-y-1 transition-opacity duration-300 
+      ${collapsed ? 'opacity-100' : 'opacity-100'}`}>
+      <NavLink
+        to="/dashboard"
+        className={({ isActive }) =>
+          `group flex items-center px-2 py-3 rounded-md ${
+            isActive
+              ? 'bg-green-600 text-white'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          } ${collapsed ? 'justify-center' : ''}`
+        }
+        onClick={closeSidebar}
+        title="Dashboard"
+      >
+        <LayoutDashboard className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />
+        {!collapsed && <span className="ml-3">Dashboard</span>}
+      </NavLink>
+
+      {user?.perfil === 'Administrador' && (
+        <NavLink
+          to="/utilizadores"
+          className={({ isActive }) =>
+            `group flex items-center px-2 py-3 rounded-md ${
+              isActive
+                ? 'bg-green-600 text-white'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            } ${collapsed ? 'justify-center' : ''}`
+          }
+          onClick={closeSidebar}
+          title="Utilizadores"
+        >
+          <Users className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />
+          {!collapsed && <span className="ml-3">Utilizadores</span>}
+        </NavLink>
+      )}
+
+      <NavLink
+        to="/perfil"
+        className={({ isActive }) =>
+          `group flex items-center px-2 py-3 rounded-md ${
+            isActive
+              ? 'bg-green-600 text-white'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          } ${collapsed ? 'justify-center' : ''}`
+        }
+        onClick={closeSidebar}
+        title="Meu Perfil"
+      >
+        <User className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />
+        {!collapsed && <span className="ml-3">Meu Perfil</span>}
+      </NavLink>
+    </nav>
+  );
+
+  const renderBottomActions = (collapsed: boolean) => (
+    <div className={`absolute bottom-0 w-full border-t border-gray-200 dark:border-gray-700 px-4 py-4 transition-opacity duration-300 
+      ${collapsed ? 'opacity-100' : 'opacity-100'}`}>
+      <button
+        className={`flex items-center px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 w-full rounded-md
+          ${collapsed ? 'justify-center' : ''}`}
+        onClick={toggleDarkMode}
+        title={darkMode ? 'Modo Claro' : 'Modo Escuro'}
+      >
+        {darkMode ? <Sun className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} /> : <Moon className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />}
+        {!collapsed && (darkMode ? 'Modo Claro' : 'Modo Escuro')}
+      </button>
+      <button
+        className={`flex items-center px-2 py-2 mt-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full rounded-md
+          ${collapsed ? 'justify-center' : ''}`}
+        onClick={handleLogout}
+        title="Sair"
+      >
+        <LogOut className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />
+        {!collapsed && <span>Sair</span>}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      {/* Sidebar para dispositivos móveis */}
-      <div className={`lg:hidden fixed inset-0 z-20 transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="absolute inset-0 bg-gray-600 dark:bg-gray-900 opacity-75" onClick={closeSidebar}></div>
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
+      {/* Sidebar for mobile */}
+      <div
+        className={`lg:hidden fixed inset-0 z-20 transition-opacity ${
+          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div
+          className="absolute inset-0 bg-gray-600 dark:bg-gray-900 opacity-75"
+          onClick={closeSidebar}
+        ></div>
       </div>
 
       {/* Sidebar */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-800 overflow-y-auto transition-transform transform
-                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`fixed lg:static inset-y-0 left-0 z-30 
+          ${sidebarCollapsed ? 'w-16' : 'w-64'} 
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+          lg:translate-x-0 
+          bg-white dark:bg-gray-800 
+          overflow-hidden 
+          transition-all 
+          duration-300 
+          ease-in-out 
+          relative`}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-8 h-8">
-              <circle cx="50" cy="50" r="45" fill="#32127A" />
-              <circle cx="50" cy="50" r="35" fill="#A4D233" />
-              <circle cx="50" cy="50" r="25" fill="#00ACEB" />
-              <circle cx="50" cy="50" r="15" fill="#FFFFFF" />
-            </svg>
-            <span className="text-lg font-semibold text-gray-800 dark:text-white">EDP Gestão</span>
+          <div className={`flex items-center space-x-2 transition-opacity duration-300 
+            ${sidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>
+            <img src="/Logo_EDP.svg" alt="EDP Logo" className="w-8 h-8" />
+            <img src="/name_EDP.svg" alt="EDP Name" className="h-6" />
           </div>
-          <button className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white" onClick={closeSidebar}>
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="mt-5 px-4 space-y-1">
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              `group flex items-center px-2 py-3 rounded-md ${
-                isActive
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`
-            }
-            onClick={closeSidebar}
-          >
-            <LayoutDashboard className="mr-3 h-5 w-5" />
-            Dashboard
-          </NavLink>
-
-          {user?.perfil === 'Administrador' && (
-            <NavLink
-              to="/utilizadores"
-              className={({ isActive }) =>
-                `group flex items-center px-2 py-3 rounded-md ${
-                  isActive
-                    ? 'bg-green-600 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`
-              }
+          
+          <div className="flex items-center space-x-2">
+            {/* Mobile close button */}
+            <button
+              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
               onClick={closeSidebar}
             >
-              <Users className="mr-3 h-5 w-5" />
-              Utilizadores
-            </NavLink>
-          )}
-
-          <NavLink
-            to="/perfil"
-            className={({ isActive }) =>
-              `group flex items-center px-2 py-3 rounded-md ${
-                isActive
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`
-            }
-            onClick={closeSidebar}
-          >
-            <User className="mr-3 h-5 w-5" />
-            Meu Perfil
-          </NavLink>
-        </nav>
-
-        <div className="absolute bottom-0 w-full border-t border-gray-200 dark:border-gray-700 px-4 py-4">
-          <button
-            className="flex items-center px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 w-full rounded-md"
-            onClick={toggleDarkMode}
-          >
-            {darkMode ? <Sun className="mr-3 h-5 w-5" /> : <Moon className="mr-3 h-5 w-5" />}
-            {darkMode ? 'Modo Claro' : 'Modo Escuro'}
-          </button>
-          <button
-            className="flex items-center px-2 py-2 mt-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full rounded-md"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-3 h-5 w-5" />
-            Sair
-          </button>
+              <X size={20} />
+            </button>
+            
+            {/* Sidebar collapse toggle */}
+            <button
+              className="hidden lg:block p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+              onClick={toggleSidebarCollapse}
+            >
+              {sidebarCollapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
+
+        {renderNavLinks(sidebarCollapsed)}
+
+        {renderBottomActions(sidebarCollapsed)}
       </div>
 
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Cabeçalho */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm z-10">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="bg-white dark:bg-gray-800 shadow-sm z-10 flex-shrink-0">
           <div className="mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center -ml-2 lg:hidden">
@@ -158,7 +208,7 @@ const MainLayout: React.FC = () => {
                       {user?.foto_perfil && !imageError ? (
                         <img
                           src={getAvatarUrl(user.foto_perfil) || undefined}
-                          alt={user?.nome || ""}
+                          alt={user?.nome || ''}
                           className="w-full h-full object-cover"
                           onError={handleImageError}
                         />
@@ -178,7 +228,7 @@ const MainLayout: React.FC = () => {
                             {user?.foto_perfil && !imageError ? (
                               <img
                                 src={getAvatarUrl(user.foto_perfil) || undefined}
-                                alt={user?.nome || ""}
+                                alt={user?.nome || ''}
                                 className="w-full h-full object-cover"
                                 onError={handleImageError}
                               />
@@ -218,7 +268,7 @@ const MainLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Conteúdo da página */}
+        {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 md:p-8">
           <Outlet />
         </main>

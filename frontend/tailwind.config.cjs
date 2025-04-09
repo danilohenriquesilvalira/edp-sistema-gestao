@@ -54,7 +54,7 @@ export default {
           200: '#bbf7d0',
           300: '#86efac',
           400: '#4ade80',
-          50: '#22c55e',
+          500: '#22c55e',
           600: '#16a34a',
           700: '#15803d',
           800: '#166534',
@@ -114,7 +114,6 @@ export default {
         'fade-in-out': 'fadeInOut 5s infinite ease-in-out',
         'rotate-slow': 'rotateSlow 10s linear infinite',
         'slide-in-bottom': 'slideInBottom 1s ease-out',
-        'spin-slow': 'spin 3s linear infinite',
       },
       backgroundImage: {
         'gradient-edp': 'linear-gradient(to right, var(--tw-gradient-stops))',
