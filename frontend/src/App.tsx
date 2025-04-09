@@ -1,111 +1,215 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import React, { useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 
 // Contextos
-import { AuthProvider } from '@/contexts/AuthContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
-
-// Páginas
-import Login from '@/pages/Login'
-import Dashboard from '@/pages/Dashboard'
-import UserManagement from '@/pages/UserManagement'
-import Profile from '@/pages/Profile'
+import { AuthProvider } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 // Layout
-import MainLayout from '@/components/layout/MainLayout'
+import MainLayout from '@/components/layout/MainLayout';
 
-// Hook personalizado
-import { useAuth } from '@/hooks/useAuth'
+// Página de carregamento
+import LoadingPage from '@/components/common/LoadingPage';
+
+// Importação das páginas com lazy loading para melhor performance
+const Login = lazy(() => import('@/pages/Login'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const UserManagement = lazy(() => import('@/pages/UserManagement'));
+const AuditLogs = lazy(() => import('@/pages/AuditLogs'));
+const Permissions = lazy(() => import('@/pages/Permissions'));
+const SystemConfig = lazy(() => import('@/pages/SystemConfig'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
 
 // Componente de proteção de rotas
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth()
-  const location = useLocation()
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-    </div>
+    return <LoadingPage />;
   }
   
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
-  return children
-}
+  return <>{children}</>;
+};
 
 // Componente para redirecionar usuários já autenticados
-const RedirectIfAuthenticated = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth()
+const RedirectIfAuthenticated: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
   
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-    </div>
+    return <LoadingPage />;
   }
   
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/dashboard" replace />;
   }
   
-  return children
-}
+  return <>{children}</>;
+};
 
 // Componente para rotas que requerem perfil de administrador
-const AdminRoute = ({ children }) => {
-  const { user, isAuthenticated, loading } = useAuth()
-  const location = useLocation()
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-    </div>
+    return <LoadingPage />;
   }
   
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
   if (user?.perfil !== 'Administrador') {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/dashboard" replace />;
   }
   
-  return children
-}
+  return <>{children}</>;
+};
 
-function App() {
+// Componente principal
+const AppContent: React.FC = () => {
+  const { isAuthenticated, checkAuth, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Verificar autenticação ao iniciar
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Redirecionamento inteligente após autenticação
+  useEffect(() => {
+    if (isAuthenticated && location.pathname === '/login') {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, location.pathname, navigate]);
+
+  if (loading && location.pathname !== '/login') {
+    return <LoadingPage />;
+  }
+
+  return (
+    <>
+      <Routes>
+        {/* Rotas públicas */}
+        <Route path="/login" element={
+          <RedirectIfAuthenticated>
+            <Suspense fallback={<LoadingPage />}>
+              <Login />
+            </Suspense>
+          </RedirectIfAuthenticated>
+        } />
+        
+        <Route path="/esqueceu-senha" element={
+          <RedirectIfAuthenticated>
+            <Suspense fallback={<LoadingPage />}>
+              <ForgotPassword />
+            </Suspense>
+          </RedirectIfAuthenticated>
+        } />
+        
+        <Route path="/redefinir-senha" element={
+          <Suspense fallback={<LoadingPage />}>
+            <ResetPassword />
+          </Suspense>
+        } />
+        
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        {/* Rotas protegidas */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }>
+          <Route path="dashboard" element={
+            <Suspense fallback={<LoadingPage />}>
+              <Dashboard />
+            </Suspense>
+          } />
+          
+          <Route path="perfil" element={
+            <Suspense fallback={<LoadingPage />}>
+              <Profile />
+            </Suspense>
+          } />
+          
+          {/* Rotas de administrador */}
+          <Route path="utilizadores" element={
+            <AdminRoute>
+              <Suspense fallback={<LoadingPage />}>
+                <UserManagement />
+              </Suspense>
+            </AdminRoute>
+          } />
+          
+          <Route path="auditoria" element={
+            <AdminRoute>
+              <Suspense fallback={<LoadingPage />}>
+                <AuditLogs />
+              </Suspense>
+            </AdminRoute>
+          } />
+          
+          <Route path="permissoes" element={
+            <AdminRoute>
+              <Suspense fallback={<LoadingPage />}>
+                <Permissions />
+              </Suspense>
+            </AdminRoute>
+          } />
+          
+          <Route path="configuracoes" element={
+            <AdminRoute>
+              <Suspense fallback={<LoadingPage />}>
+                <SystemConfig />
+              </Suspense>
+            </AdminRoute>
+          } />
+        </Route>
+        
+        {/* Página 404 */}
+        <Route path="*" element={
+          <Suspense fallback={<LoadingPage />}>
+            <NotFound />
+          </Suspense>
+        } />
+      </Routes>
+      
+      <ToastContainer 
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+    </>
+  );
+};
+
+const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={
-            <RedirectIfAuthenticated>
-              <Login />
-            </RedirectIfAuthenticated>
-          } />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          <Route path="/" element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="utilizadores" element={
-              <AdminRoute>
-                <UserManagement />
-              </AdminRoute>
-            } />
-            <Route path="perfil" element={<Profile />} />
-          </Route>
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
-  )
-}
+  );
+};
 
-export default App
+export default App;
