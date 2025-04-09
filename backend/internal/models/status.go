@@ -12,7 +12,7 @@ type StatusUtilizador struct {
 	Online          bool      `gorm:"default:false" json:"online"`
 	UltimaAtividade time.Time `json:"ultima_atividade"`
 	IP              string    `gorm:"size:50" json:"ip"`
-	Dispositivo     string    `gorm:"size:100" json:"dispositivo"`
+	Dispositivo     string    `gorm:"size:255" json:"dispositivo"` // Aumentado para 255
 }
 
 // TableName especifica o nome da tabela para o modelo StatusUtilizador
@@ -23,6 +23,11 @@ func (StatusUtilizador) TableName() string {
 // AtualizarStatusUtilizador atualiza o status de um utilizador
 func AtualizarStatusUtilizador(userID uint, online bool, ip string, dispositivo string) error {
 	var status StatusUtilizador
+
+	// Limitar o tamanho do dispositivo para evitar erro
+	if len(dispositivo) > 250 {
+		dispositivo = dispositivo[:250]
+	}
 
 	result := config.DB.Where("utilizador_id = ?", userID).First(&status)
 

@@ -3,6 +3,7 @@ import api from '@/services/api';
 import { toast } from 'react-toastify';
 import { User } from '@/contexts/AuthContext';
 import { X, Edit, Shield, Clock, History } from 'lucide-react';
+import axios, { AxiosError } from 'axios';
 
 interface UserDetailsModalProps {
   isOpen: boolean;
@@ -37,13 +38,38 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     
     setLoading(true);
     try {
-      const response = await api.get(`/api/sessoes/${user.id}?ativas=true`);
+      // Usando o método específico da API em vez de chamar diretamente
+      const response = await api.getUserSessions(user.id, true);
       if (response.data.sucesso) {
         setSessions(response.data.dados);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar sessões:', error);
-      toast.error('Erro ao carregar sessões do utilizador');
+      
+      // Tratamento de erro mais detalhado
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        
+        if (axiosError.response) {
+          const statusCode = axiosError.response.status;
+          
+          if (statusCode === 403) {
+            toast.error('Sem permissão para visualizar as sessões deste utilizador');
+          } else if (statusCode === 404) {
+            toast.error('Sessões não encontradas');
+          } else if (axiosError.response.data && typeof axiosError.response.data === 'object' && 'mensagem' in axiosError.response.data) {
+            toast.error(axiosError.response.data.mensagem as string);
+          } else {
+            toast.error('Erro ao carregar sessões do utilizador');
+          }
+        } else if (axiosError.request) {
+          toast.error('Não foi possível conectar ao servidor');
+        } else {
+          toast.error('Erro ao carregar sessões do utilizador');
+        }
+      } else {
+        toast.error('Erro ao carregar sessões do utilizador');
+      }
     } finally {
       setLoading(false);
     }
@@ -51,14 +77,27 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
 
   const terminateSession = async (sessionId: number) => {
     try {
-      const response = await api.delete(`/api/sessoes/${sessionId}`);
+      // Usando o método específico da API em vez de chamar diretamente
+      const response = await api.terminateSession(sessionId);
       if (response.data.sucesso) {
         toast.success('Sessão encerrada com sucesso');
         loadSessions();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao encerrar sessão:', error);
-      toast.error('Erro ao encerrar sessão');
+      
+      // Tratamento de erro mais detalhado
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        
+        if (axiosError.response && axiosError.response.data && typeof axiosError.response.data === 'object' && 'mensagem' in axiosError.response.data) {
+          toast.error(axiosError.response.data.mensagem as string);
+        } else {
+          toast.error('Erro ao encerrar sessão');
+        }
+      } else {
+        toast.error('Erro ao encerrar sessão');
+      }
     }
   };
 
@@ -66,14 +105,27 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ isOpen, onClose, us
     if (!user) return;
     
     try {
-      const response = await api.delete(`/api/sessoes/utilizador/${user.id}`);
+      // Usando o método específico da API em vez de chamar diretamente
+      const response = await api.terminateAllUserSessions(user.id);
       if (response.data.sucesso) {
         toast.success('Todas as sessões encerradas com sucesso');
         loadSessions();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao encerrar todas as sessões:', error);
-      toast.error('Erro ao encerrar todas as sessões');
+      
+      // Tratamento de erro mais detalhado
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        
+        if (axiosError.response && axiosError.response.data && typeof axiosError.response.data === 'object' && 'mensagem' in axiosError.response.data) {
+          toast.error(axiosError.response.data.mensagem as string);
+        } else {
+          toast.error('Erro ao encerrar todas as sessões');
+        }
+      } else {
+        toast.error('Erro ao encerrar todas as sessões');
+      }
     }
   };
 

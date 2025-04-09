@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
 // Tipo para o usuário
@@ -34,7 +35,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [axiosInstance] = useState(() => 
+  const [axiosInstance] = useState(() =>
     axios.create({
       baseURL: API_URL,
       headers: {
@@ -45,14 +46,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('access_token');
-    
+
     if (!token) {
       setLoading(false);
       return;
     }
-    
+
     axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
+
     try {
       const response = await axiosInstance.get('/api/auth/me');
       if (response.data?.sucesso) {
@@ -77,7 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     checkAuth();
-    
+
     // Configurar intervalos para refresh de token e heartbeat
     const refreshInterval = setInterval(() => {
       if (localStorage.getItem('access_token')) {
@@ -88,7 +89,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const heartbeatInterval = setInterval(() => {
       if (localStorage.getItem('access_token')) {
         axiosInstance.post('/api/status/heartbeat')
-          .catch(() => {}); // Ignorar erros no heartbeat
+          .catch(() => { }); // Ignorar erros no heartbeat
       }
     }, 2 * 60 * 1000); // 2 minutos
 
@@ -110,16 +111,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
       setUser(userData);
-      toast.success('Login realizado com sucesso!');
+      toast.success('Login realizado!', {
+        position: 'top-right',
+        autoClose: 2000, // Diminui a duração
+        hideProgressBar: true, // Remove a barra de progresso
+        closeOnClick: true,
+        pauseOnHover: false, // Desativa a pausa ao passar o mouse
+        draggable: false, // Desativa a possibilidade de arrastar
+        style: {
+          minHeight: '40px', // Reduz a altura
+          fontSize: '14px', // Reduz o tamanho da fonte
+        },
+        className: 'bg-green-100 text-green-800 rounded-md shadow-md', // Estilo personalizado
+      });
     } catch (error: any) {
       console.error('Erro ao fazer login:', error);
-      let message = 'Erro ao fazer login. Verifique suas credenciais.';
-      
+      let message = 'Erro de login.';
+
       if (error.response?.data?.mensagem) {
         message = error.response.data.mensagem;
       }
-      
-      toast.error(message);
+
+      toast.error(message, {
+        position: 'top-right',
+        autoClose: 3000, // Diminui a duração
+        hideProgressBar: true, // Remove a barra de progresso
+        closeOnClick: true,
+        pauseOnHover: false, // Desativa a pausa ao passar o mouse
+        draggable: false, // Desativa a possibilidade de arrastar
+        style: {
+          minHeight: '40px', // Reduz a altura
+          fontSize: '14px', // Reduz o tamanho da fonte
+        },
+        className: 'bg-red-100 text-red-800 rounded-md shadow-md', // Estilo personalizado
+      });
       throw error;
     } finally {
       setLoading(false);
@@ -157,7 +182,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async (showToast = true) => {
     setLoading(true);
     const storedRefreshToken = localStorage.getItem('refresh_token');
-    
+
     if (storedRefreshToken) {
       try {
         await axiosInstance.post('/api/auth/logout', {
@@ -172,11 +197,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('refresh_token');
     delete axiosInstance.defaults.headers.common['Authorization'];
     setUser(null);
-    
+
     if (showToast) {
-      toast.success('Sessão encerrada com sucesso!');
+      toast.success('Sessão encerrada!', {
+        position: 'top-right',
+        autoClose: 2000, // Diminui a duração
+        hideProgressBar: true, // Remove a barra de progresso
+        closeOnClick: true,
+        pauseOnHover: false, // Desativa a pausa ao passar o mouse
+        draggable: false, // Desativa a possibilidade de arrastar
+        style: {
+          minHeight: '40px', // Reduz a altura
+          fontSize: '14px', // Reduz o tamanho da fonte
+        },
+        className: 'bg-blue-100 text-blue-800 rounded-md shadow-md', // Estilo personalizado
+      });
     }
-    
+
     setLoading(false);
   };
 
@@ -195,6 +232,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }}
     >
       {children}
+      <ToastContainer />
     </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;

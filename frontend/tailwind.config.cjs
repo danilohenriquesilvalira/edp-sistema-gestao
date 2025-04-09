@@ -8,19 +8,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Cores da EDP Portugal
         edp: {
           primary: {
-            purple: '#32127A', // Roxo EDP
-            green: '#A4D233',  // Verde EDP
-            blue: '#00ACEB',   // Azul EDP
-            DEFAULT: '#32127A', // Cor principal
+            purple: '#32127A',
+            green: '#A4D233',
+            blue: '#00ACEB',
+            DEFAULT: '#32127A',
           },
           secondary: {
-            red: '#FF0039',     // Vermelho para alertas
-            orange: '#FF9114',  // Laranja para warnings
-            yellow: '#FFBE00',  // Amarelo para notas
-            DEFAULT: '#00ACEB', // Cor secundária
+            red: '#FF0039',
+            orange: '#FF9114',
+            yellow: '#FFBE00',
+            DEFAULT: '#00ACEB',
           },
           neutral: {
             50: '#F8FAFC',
@@ -55,7 +54,7 @@ export default {
           200: '#bbf7d0',
           300: '#86efac',
           400: '#4ade80',
-          500: '#22c55e',
+          50: '#22c55e',
           600: '#16a34a',
           700: '#15803d',
           800: '#166534',
@@ -106,17 +105,39 @@ export default {
       },
       boxShadow: {
         'edp': '0 10px 15px -3px rgba(50, 18, 122, 0.1), 0 4px 6px -2px rgba(50, 18, 122, 0.05)',
+        'neu-light': '10px 10px 20px #cbcfd1, -10px -10px 20px #ffffff',
+        'neu-dark': '5px 5px 10px #1a1a1a, -5px -5px 10px #303030',
+        'glass': '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in-out': 'fadeInOut 5s infinite ease-in-out',
+        'rotate-slow': 'rotateSlow 10s linear infinite',
+        'slide-in-bottom': 'slideInBottom 1s ease-out',
+        'spin-slow': 'spin 3s linear infinite',
       },
       backgroundImage: {
         'gradient-edp': 'linear-gradient(to right, var(--tw-gradient-stops))',
+        'gradient-glass': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%)',
       },
       gradientColorStops: {
         'edp-start': '#32127A',
         'edp-mid': '#A4D233',
         'edp-end': '#00ACEB',
+      },
+      keyframes: {
+        fadeInOut: {
+          '0%, 100%': { opacity: 0.1 },
+          '50%': { opacity: 0.2 },
+        },
+        rotateSlow: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+        slideInBottom: {
+          '0%': { transform: 'translateY(100%)', opacity: 0 },
+          '100%': { transform: 'translateY(0)', opacity: 1 },
+        },
       },
     },
   },
@@ -135,6 +156,10 @@ export default {
         },
         '.transform-flip-y': {
           transform: 'scaleY(-1)',
+        },
+        '.backdrop-blur-glass': {
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
         },
       }
       addUtilities(newUtilities)

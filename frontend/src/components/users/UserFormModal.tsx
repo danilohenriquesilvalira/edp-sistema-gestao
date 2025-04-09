@@ -3,6 +3,7 @@ import api from '@/services/api';
 import { toast } from 'react-toastify';
 import { Eye, EyeOff, X } from 'lucide-react';
 import { User } from '@/contexts/AuthContext';
+import axios, { AxiosError } from 'axios';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ interface UserFormModalProps {
 interface UserFormData {
   nome: string;
   email: string;
-  password: string;
+  password?: string; // Alterado para opcional, resolvendo o problema com delete
   perfil: 'Administrador' | 'Utilizador';
   estado: 'Ativo' | 'Inativo';
   dois_fatores_ativo: boolean;
@@ -62,7 +63,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
       newErrors.email = 'Email inválido';
     }
     
-    if (!isEditing && !formData.password.trim()) {
+    if (!isEditing && !formData.password) {
       newErrors.password = 'Senha é obrigatória para novos utilizadores';
     } else if (formData.password && formData.password.length < 6) {
       newErrors.password = 'A senha deve ter pelo menos 6 caracteres';
@@ -106,18 +107,40 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
         delete payload.password;
       }
       
-      if (isEditing) {
-        await api.put(`/api/utilizadores/${user.id}`, payload);
+      if (isEditing && user) {
+        // Usando o método específico da API em vez de chamar diretamente
+        await api.updateUser(user.id, payload);
         toast.success('Utilizador atualizado com sucesso!');
       } else {
-        await api.post('/api/utilizadores', payload);
+        // Usando o método específico da API em vez de chamar diretamente
+        await api.createUser(payload);
         toast.success('Utilizador criado com sucesso!');
       }
       
       onSave();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar utilizador:', error);
-      toast.error('Erro ao salvar utilizador');
+      
+      // Tratamento de erro mais detalhado
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        
+        if (axiosError.response) {
+          if (axiosError.response.status === 409) {
+            toast.error('Este email já está em uso por outro utilizador');
+          } else if (axiosError.response.data && typeof axiosError.response.data === 'object' && 'mensagem' in axiosError.response.data) {
+            toast.error(axiosError.response.data.mensagem as string);
+          } else {
+            toast.error('Erro ao salvar utilizador');
+          }
+        } else if (axiosError.request) {
+          toast.error('Não foi possível conectar ao servidor');
+        } else {
+          toast.error('Erro ao salvar utilizador');
+        }
+      } else {
+        toast.error('Erro ao salvar utilizador');
+      }
     } finally {
       setLoading(false);
     }
@@ -198,7 +221,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                       type={showPassword ? "text" : "password"}
                       id="password"
                       name="password"
-                      value={formData.password}
+                      value={formData.password || ''}
                       onChange={handleChange}
                       className={`w-full rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 border ${
                         errors.password ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600'
