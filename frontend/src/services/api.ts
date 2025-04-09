@@ -42,6 +42,9 @@ class ApiService {
         return response;
       },
       async (error: AxiosError) => {
+        // Log mais detalhado para debug
+        this.logRequestError(error);
+        
         // Processo de renovação de token
         if (error.response?.status === 401) {
           const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
@@ -76,6 +79,19 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  private logRequestError(error: AxiosError): void {
+    if (error.response) {
+      console.error('Resposta de erro:', {
+        status: error.response.status,
+        data: error.response.data
+      });
+    } else if (error.request) {
+      console.error('Sem resposta do servidor:', error.request);
+    } else {
+      console.error('Erro na configuração da requisição:', error.message);
+    }
   }
 
   private async refreshAccessToken(): Promise<string> {

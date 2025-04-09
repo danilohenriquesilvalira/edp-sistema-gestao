@@ -64,12 +64,12 @@ const Permissions: React.FC = () => {
       const response = await apiService.getPermissions();
       
       if (response.data.sucesso) {
-        const perms = response.data.dados;
+        const perms = response.data.dados as Permission[];
         setPermissions(perms);
         setFilteredPermissions(perms);
         
-        // Extrair módulos únicos
-        const modules = [...new Set(perms.map(p => p.modulo))];
+        // Extrair módulos únicos - corrigindo a tipagem
+        const modules = [...new Set(perms.map(p => p.modulo))] as string[];
         setAvailableModules(modules);
         
         // Inicializar estados de expansão
@@ -382,6 +382,7 @@ const Permissions: React.FC = () => {
               Nova Permissão
             </button>
           )}
+          
           <button
             className={`py-2 px-4 rounded-md flex items-center transition-colors ${
               showProfileTab 

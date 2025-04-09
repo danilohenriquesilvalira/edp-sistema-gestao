@@ -1,11 +1,14 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 
 // Contextos
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+
+// Utilitários
+import { registerConnectivityHandlers } from '@/utils/connectivity';
 
 // Layout
 import MainLayout from '@/components/layout/MainLayout';
@@ -85,6 +88,34 @@ const AppContent: React.FC = () => {
   // Verificar autenticação ao iniciar
   useEffect(() => {
     checkAuth();
+  }, [checkAuth]);
+
+  // Monitoramento de conectividade
+  useEffect(() => {
+    // Registrar handlers para mudanças na conexão
+    const unregister = registerConnectivityHandlers(
+      // Quando ficar online
+      () => {
+        toast.success('Conexão com a internet restaurada', { 
+          autoClose: 2000,
+          toastId: 'connectivity-online' 
+        });
+        // Verificar autenticação novamente
+        checkAuth();
+      },
+      // Quando ficar offline
+      () => {
+        toast.error('Sem conexão com a internet. Algumas funcionalidades podem não estar disponíveis.', {
+          autoClose: false,
+          toastId: 'connectivity-offline'
+        });
+      }
+    );
+    
+    // Cleanup
+    return () => {
+      unregister();
+    };
   }, [checkAuth]);
 
   // Redirecionamento inteligente após autenticação

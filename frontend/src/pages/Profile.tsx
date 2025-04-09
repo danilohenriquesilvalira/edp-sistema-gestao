@@ -58,7 +58,7 @@ const Profile: React.FC = () => {
   
   const loadPreferences = async () => {
     try {
-      const response = await api.get('/api/preferencias');
+      const response = await api.getUserPreferences();
       if (response.data.sucesso) {
         const prefs = response.data.dados;
         setPreferences({
@@ -77,7 +77,7 @@ const Profile: React.FC = () => {
     if (!user) return;
     
     try {
-      const response = await api.get(`/api/sessoes/${user.id}?ativas=true`);
+      const response = await api.getUserSessions(user.id, true);
       if (response.data.sucesso) {
         setSessionsCount(response.data.dados.length);
       }
@@ -89,7 +89,7 @@ const Profile: React.FC = () => {
   const savePreferences = async () => {
     setLoadingPreferences(true);
     try {
-      const response = await api.put('/api/preferencias', {
+      const response = await api.updateUserPreferences({
         tema_escuro: preferences.tema_escuro,
         idioma: preferences.idioma,
         notificacoes: preferences.notificacoes,
@@ -142,10 +142,10 @@ const Profile: React.FC = () => {
     
     setLoadingPassword(true);
     try {
-      const response = await api.post('/api/password/change', {
-        current_password: passwordForm.current_password,
-        new_password: passwordForm.new_password
-      });
+      const response = await api.changePassword(
+        passwordForm.current_password,
+        passwordForm.new_password
+      );
       
       if (response.data.sucesso) {
         toast.success('Senha alterada com sucesso!');
@@ -157,14 +157,19 @@ const Profile: React.FC = () => {
       }
     } catch (error) {
       console.error('Erro ao alterar senha:', error);
-      if (error.response && error.response.data && error.response.data.mensagem) {
-        if (error.response.data.mensagem === 'Senha atual incorreta') {
-          setPasswordErrors({
-            ...passwordErrors,
-            current_password: 'Senha atual incorreta'
-          });
+      if (error instanceof Error) {
+        const axiosError = error as any;
+        if (axiosError.response && axiosError.response.data && axiosError.response.data.mensagem) {
+          if (axiosError.response.data.mensagem === 'Senha atual incorreta') {
+            setPasswordErrors({
+              ...passwordErrors,
+              current_password: 'Senha atual incorreta'
+            });
+          } else {
+            toast.error(axiosError.response.data.mensagem);
+          }
         } else {
-          toast.error(error.response.data.mensagem);
+          toast.error('Erro ao alterar senha');
         }
       } else {
         toast.error('Erro ao alterar senha');
@@ -218,7 +223,9 @@ const Profile: React.FC = () => {
     // Criar preview
     const reader = new FileReader();
     reader.onload = (e) => {
-      setAvatarPreview(e.target?.result as string);
+      if (e.target?.result) {
+        setAvatarPreview(e.target.result as string);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -228,13 +235,8 @@ const Profile: React.FC = () => {
     
     setLoadingAvatar(true);
     
-    const formData = new FormData();
-    formData.append('avatar', avatarFile);
-    
     try {
-      const response = await api.post(`/api/utilizadores/${user.id}/avatar`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const response = await api.uploadProfilePicture(user.id, avatarFile);
       
       if (response.data.sucesso) {
         toast.success('Foto de perfil atualizada com sucesso!');
@@ -260,7 +262,7 @@ const Profile: React.FC = () => {
     if (!user) return;
     
     try {
-      const response = await api.delete(`/api/sessoes/utilizador/${user.id}`);
+      const response = await api.terminateAllUserSessions(user.id);
       if (response.data.sucesso) {
         toast.success('Todas as sessões foram encerradas. Você será redirecionado para o login.');
         setTimeout(() => {

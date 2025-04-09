@@ -7,6 +7,8 @@ import {
 import UserFormModal from '@/components/users/UserFormModal';
 import UserDetailsModal from '@/components/users/UserDetailsModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
+import ErrorState from '@/components/common/ErrorState';
+import { isOnline } from '@/utils/connectivity';
 import { User } from '@/contexts/AuthContext';
 
 interface UserListResponse {
@@ -35,6 +37,10 @@ const UserManagement: React.FC = () => {
     estado: ''
   });
   
+  // Estados de erro
+  const [error, setError] = useState<string | null>(null);
+  const [isNetworkError, setIsNetworkError] = useState(false);
+  
   // Estados para modais
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -45,34 +51,66 @@ const UserManagement: React.FC = () => {
   // Carregar usuários
   const loadUsers = async () => {
     setLoading(true);
+    setError(null);
+    setIsNetworkError(false);
+    
     try {
-      let queryParams = new URLSearchParams({
+      // Verificar conexão com internet primeiro
+      if (!isOnline()) {
+        setIsNetworkError(true);
+        setError('Sem conexão com a internet');
+        toast.error('Sem conexão com a internet. Verifique sua conexão e tente novamente.');
+        setLoading(false);
+        return;
+      }
+      
+      // Construir parâmetros de consulta
+      const queryParams: Record<string, string | number> = {
         page: page.toString(),
         limit: limit.toString()
-      });
+      };
       
+      // Adicionar filtros apenas se tiverem valor
       if (search) {
-        queryParams.append('nome', search);
+        queryParams.nome = search;
       }
       
       if (filters.perfil) {
-        queryParams.append('perfil', filters.perfil);
+        queryParams.perfil = filters.perfil;
       }
       
       if (filters.estado) {
-        queryParams.append('estado', filters.estado);
+        queryParams.estado = filters.estado;
       }
       
-      const response = await api.get<UserListResponse>(`/api/utilizadores?${queryParams.toString()}`);
+      console.log('Consultando API com parâmetros:', queryParams);
+      
+      // Usar o método específico do serviço API
+      const response = await api.getUsers(queryParams);
+      
+      console.log('Resposta recebida:', response.data);
       
       if (response.data.sucesso) {
         setUsers(response.data.dados);
-        setTotalPages(response.data.meta.total_pages);
-        setTotalUsers(response.data.meta.total);
+        setTotalPages(response.data.meta.total_pages || 1);
+        setTotalUsers(response.data.meta.total || 0);
+      } else {
+        console.error('API retornou sucesso=false:', response.data);
+        setError(response.data.mensagem || 'Erro ao carregar usuários');
+        toast.error(response.data.mensagem || 'Erro ao carregar usuários');
       }
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      toast.error('Erro ao carregar a lista de usuários');
+      console.error('Erro completo ao carregar usuários:', error);
+      
+      // Verificar se é um erro de rede
+      if (!navigator.onLine) {
+        setIsNetworkError(true);
+        setError('Sem conexão com a internet');
+        toast.error('Sem conexão com a internet. Verifique sua conexão e tente novamente.');
+      } else {
+        setError('Erro ao carregar a lista de usuários');
+        toast.error('Erro ao carregar a lista de usuários. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
     }
@@ -129,7 +167,7 @@ const UserManagement: React.FC = () => {
     if (!selectedUser) return;
     
     try {
-      const response = await api.delete(`/api/utilizadores/${selectedUser.id}`);
+      const response = await api.deleteUser(selectedUser.id);
       
       if (response.data.sucesso) {
         toast.success('Utilizador excluído com sucesso');
@@ -270,6 +308,17 @@ const UserManagement: React.FC = () => {
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-green-600"></div>
                     </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-4">
+                    <ErrorState 
+                      title={isNetworkError ? "Erro de Conexão" : "Erro ao Carregar Dados"}
+                      message={error}
+                      isNetworkError={isNetworkError}
+                      onRetry={loadUsers}
+                    />
                   </td>
                 </tr>
               ) : users.length === 0 ? (

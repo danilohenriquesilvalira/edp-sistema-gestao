@@ -40,9 +40,9 @@ const Login: React.FC = () => {
               <circle cx="50" cy="50" r="15" fill="#FFFFFF" />
             </svg>
           </div>
-          <h1 className="text-white text-4xl font-bold mb-6">Gestão de Utilizadores</h1>
+          <h1 className="text-white text-4xl font-bold mb-6">Gestão de Manutenção</h1>
           <p className="text-white text-xl">
-            Sistema interno para gestão e administração de contas, permissões e preferências de utilizadores da EDP.
+            Sistema interno para gestão e administração das Eclusas, permissões e preferências de utilizadores da EDP.
           </p>
         </div>
       </div>
