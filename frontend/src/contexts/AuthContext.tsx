@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'react-toastify'; // Remova a importação do ToastContainer
 import axios from 'axios';
 
 // Tipo para o usuário
@@ -111,40 +110,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
       setUser(userData);
-      toast.success('Login realizado!', {
-        position: 'top-right',
-        autoClose: 2000, // Diminui a duração
-        hideProgressBar: true, // Remove a barra de progresso
-        closeOnClick: true,
-        pauseOnHover: false, // Desativa a pausa ao passar o mouse
-        draggable: false, // Desativa a possibilidade de arrastar
-        style: {
-          minHeight: '40px', // Reduz a altura
-          fontSize: '14px', // Reduz o tamanho da fonte
-        },
-        className: 'bg-green-100 text-green-800 rounded-md shadow-md', // Estilo personalizado
-      });
+      // Simplificar configuração do toast
+      toast.success('Login realizado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao fazer login:', error);
-      let message = 'Erro de login.';
+      let message = 'Erro de login. Verifique suas credenciais.';
 
       if (error.response?.data?.mensagem) {
         message = error.response.data.mensagem;
       }
 
-      toast.error(message, {
-        position: 'top-right',
-        autoClose: 3000, // Diminui a duração
-        hideProgressBar: true, // Remove a barra de progresso
-        closeOnClick: true,
-        pauseOnHover: false, // Desativa a pausa ao passar o mouse
-        draggable: false, // Desativa a possibilidade de arrastar
-        style: {
-          minHeight: '40px', // Reduz a altura
-          fontSize: '14px', // Reduz o tamanho da fonte
-        },
-        className: 'bg-red-100 text-red-800 rounded-md shadow-md', // Estilo personalizado
-      });
+      toast.error(message);
       throw error;
     } finally {
       setLoading(false);
@@ -199,19 +175,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
 
     if (showToast) {
-      toast.success('Sessão encerrada!', {
-        position: 'top-right',
-        autoClose: 2000, // Diminui a duração
-        hideProgressBar: true, // Remove a barra de progresso
-        closeOnClick: true,
-        pauseOnHover: false, // Desativa a pausa ao passar o mouse
-        draggable: false, // Desativa a possibilidade de arrastar
-        style: {
-          minHeight: '40px', // Reduz a altura
-          fontSize: '14px', // Reduz o tamanho da fonte
-        },
-        className: 'bg-blue-100 text-blue-800 rounded-md shadow-md', // Estilo personalizado
-      });
+      // Simplificar o toast
+      toast.success('Sessão encerrada com sucesso');
     }
 
     setLoading(false);
@@ -232,7 +197,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }}
     >
       {children}
-      <ToastContainer />
+      {/* Remova o ToastContainer daqui */}
     </AuthContext.Provider>
   );
 };

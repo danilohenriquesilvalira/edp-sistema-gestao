@@ -1,6 +1,22 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { toast } from 'react-toastify';
 
+// Definir a URL base da API
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+// Função para gerar URLs completas para avatares
+export const getAvatarUrl = (path: string | undefined): string | null => {
+  if (!path) return null;
+  
+  // Se já for URL completa, retorna como está
+  if (path.startsWith('http')) return path;
+  
+  // Remove barra inicial duplicada se necessário
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  return `${API_BASE_URL}${normalizedPath}`;
+};
+
 class ApiService {
   private api: AxiosInstance;
   private refreshPromise: Promise<string> | null = null;
@@ -11,7 +27,7 @@ class ApiService {
 
   constructor() {
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+      baseURL: API_BASE_URL,
       timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +127,7 @@ class ApiService {
       
       try {
         // Fazer requisição de refresh
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
           refresh_token: refreshToken
         });
         
