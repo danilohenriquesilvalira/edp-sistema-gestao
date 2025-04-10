@@ -16,6 +16,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
+import ProfileModal from '@/components/profiles/ProfileModal'; // Adicione esta importação
 
 const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -25,6 +26,7 @@ const MainLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // Adicione este estado
 
   const handleLogout = async () => {
     await logout();
@@ -79,22 +81,8 @@ const MainLayout: React.FC = () => {
           {!collapsed && <span className="ml-3">Utilizadores</span>}
         </NavLink>
       )}
-
-      <NavLink
-        to="/perfil"
-        className={({ isActive }) =>
-          `group flex items-center px-2 py-3 rounded-md ${
-            isActive
-              ? 'bg-green-600 text-white'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-          } ${collapsed ? 'justify-center' : ''}`
-        }
-        onClick={closeSidebar}
-        title="Meu Perfil"
-      >
-        <User className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />
-        {!collapsed && <span className="ml-3">Meu Perfil</span>}
-      </NavLink>
+      
+      {/* O item "Meu Perfil" foi removido da barra lateral */}
     </nav>
   );
 
@@ -105,7 +93,7 @@ const MainLayout: React.FC = () => {
         className={`flex items-center px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 w-full rounded-md
           ${collapsed ? 'justify-center' : ''}`}
         onClick={toggleDarkMode}
-        title={darkMode ? 'Modo Claro' : 'Modo Escuro'}
+        title={darkMode ? "Modo Claro" : "Modo Escuro"}
       >
         {darkMode ? <Sun className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} /> : <Moon className={`${collapsed ? 'h-6 w-10' : 'h-5 w-5'}`} />}
         {!collapsed && (darkMode ? 'Modo Claro' : 'Modo Escuro')}
@@ -246,13 +234,16 @@ const MainLayout: React.FC = () => {
                         </div>
                       </div>
 
-                      <NavLink
-                        to="/perfil"
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={() => setUserMenuOpen(false)}
+                      {/* Botão de acesso ao perfil via modal */}
+                      <button
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          setIsProfileModalOpen(true);
+                        }}
                       >
                         Meu Perfil
-                      </NavLink>
+                      </button>
 
                       <button
                         onClick={handleLogout}
@@ -273,6 +264,12 @@ const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Modal de Perfil */}
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </div>
   );
 };
