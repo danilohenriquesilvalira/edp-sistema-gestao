@@ -50,7 +50,7 @@ interface ThemeColors {
   };
 }
 
-// Definições específicas para tema claro
+// Definições específicas para tema claro - com melhor visibilidade
 const lightTheme: ThemeColors = {
   bg: {
     primary: 'bg-white',
@@ -64,8 +64,8 @@ const lightTheme: ThemeColors = {
     muted: 'text-gray-500',
   },
   border: {
-    normal: 'border-[#212E3C]', // Alterado de 'border-gray-200'
-    subtle: 'border-[#CBD5E1]', // Alterado de 'border-gray-100'
+    normal: 'border-gray-300', // Mais escuro para melhor visibilidade
+    subtle: 'border-gray-200', // Mais escuro que o anterior
   },
   accent: {
     purple: 'bg-edp-primary-purple',
@@ -87,7 +87,7 @@ const lightTheme: ThemeColors = {
   },
   input: {
     bg: 'bg-white',
-    border: 'border-gray-300',
+    border: 'border-gray-300', // Mais escuro para melhor visibilidade
     placeholder: 'placeholder-gray-400',
     focus: 'focus:ring-edp-primary-blue focus:border-edp-primary-blue',
   },
@@ -138,6 +138,15 @@ const darkTheme: ThemeColors = {
 
 // Estilos CSS para injetar no HTML head
 const darkModeStyles = `
+:root {
+  /* Variáveis de modo claro */
+  --cl-border-normal: #d1d5db;
+  --cl-border-subtle: #e5e7eb;
+  --cl-divider: #d1d5db;
+  --cl-table-stripe: #f3f4f6;
+  --cl-card-border: #e5e7eb;
+}
+
 :root.dark {
     --bg-primary: #070c14;
     --bg-secondary: #0c1220;
