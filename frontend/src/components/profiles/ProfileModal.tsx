@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import api, { getAvatarUrl } from '@/services/api';
 import { toast } from 'react-toastify';
-// Importamos os mesmos componentes e ícones que usamos no Profile.tsx
 import { 
   Eye, 
   EyeOff, 
@@ -45,7 +44,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   
-  // Estados - reutilizamos do Profile.tsx
+  // Estados
   const [preferences, setPreferences] = useState<UserPreferences>({
     tema_escuro: darkMode,
     idioma: 'pt',
@@ -92,7 +91,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
     }));
   }, [darkMode]);
   
-  // Funções - reutilizamos do Profile.tsx
+  // Funções
   const loadPreferences = async () => {
     try {
       const response = await api.getUserPreferences();
@@ -344,6 +343,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   
   if (!isOpen || !user) return null;
   
+  // Cores EDP
+  const primaryColor = {
+    light: "#00B1EA", // Azul ciano EDP para modo claro
+    dark: "#00FFFF"   // Ciano mais brilhante para modo escuro para melhor contraste
+  };
+  
   // Renderização do modal
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -352,20 +357,20 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose}></div>
         
         {/* Modal */}
-        <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden w-full max-w-4xl transform transition-all">
+        <div className="relative bg-white dark:bg-[#212E3C] rounded-xl shadow-xl overflow-hidden w-full max-w-4xl transform transition-all">
           {/* Botão de fechar no canto superior direito */}
           <button 
-            className="absolute top-4 right-4 z-50 p-1 rounded-full bg-white/10 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="absolute top-4 right-4 z-50 p-1.5 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
             onClick={onClose}
           >
             <X size={20} />
           </button>
           
           {/* Cabeçalho com Banner para o avatar */}
-          <div className={`w-full ${
+          <div className={`w-full bg-gradient-to-r ${
             darkMode
-              ? 'bg-blue-900'
-              : 'bg-blue-600'
+              ? 'from-cyan-600 to-cyan-500'
+              : 'from-cyan-500 to-cyan-400'
           } py-8 px-8 flex flex-col items-center`}>
             
             {/* Avatar grande e centralizado */}
@@ -385,7 +390,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     onError={handleImageError}
                   />
                 ) : (
-                  <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-4xl font-semibold">
+                  <div className="w-full h-full bg-cyan-600 flex items-center justify-center text-white text-4xl font-semibold">
                     {user.nome.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -395,8 +400,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 hover:bg-gray-700' 
                       : 'bg-white hover:bg-gray-100'
-                  } rounded-full p-2 shadow-md cursor-pointer transition-colors border border-blue-300`}>
-                    <Camera size={16} className="text-blue-500" />
+                  } rounded-full p-2 shadow-md cursor-pointer transition-colors border border-cyan-300`}>
+                    <Camera size={16} className="text-cyan-500" />
                     <input
                       id="avatar-upload-modal"
                       type="file"
@@ -414,10 +419,10 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
             <p className="text-white/90 text-sm mb-2">{user.email}</p>
             
             <div className="flex justify-center gap-2 mb-2">
-              <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-blue-700/60 text-white border border-blue-600/30">
+              <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-cyan-600/60 text-white border border-cyan-400/30">
                 {user.perfil}
               </span>
-              <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-green-700/60 text-white border border-green-600/30">
+              <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-green-600/60 text-white border border-green-400/30">
                 {user.estado}
               </span>
             </div>
@@ -428,7 +433,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                 <button
                   onClick={uploadAvatar}
                   disabled={loadingAvatar}
-                  className="px-3 py-1 bg-white text-blue-700 rounded text-xs hover:bg-blue-50 font-medium transition-colors"
+                  className="px-3 py-1 bg-white text-cyan-600 rounded text-xs hover:bg-cyan-50 font-medium transition-colors"
                 >
                   {loadingAvatar ? (
                     <RefreshCw size={12} className="animate-spin mr-1 inline" />
@@ -440,7 +445,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                 
                 <button
                   onClick={cancelAvatarChange}
-                  className="px-3 py-1 bg-blue-800 text-white rounded text-xs hover:bg-blue-700 font-medium transition-colors"
+                  className="px-3 py-1 bg-cyan-700 text-white rounded text-xs hover:bg-cyan-800 font-medium transition-colors"
                 >
                   <X size={12} className="mr-1 inline" />
                   Cancelar
@@ -464,17 +469,17 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
           
           {/* Área de navegação */}
           <div className={`flex justify-center ${
-            darkMode ? 'bg-gray-900' : 'bg-white'
+            darkMode ? 'bg-[#212E3C]' : 'bg-white'
           } border-b ${
-            darkMode ? 'border-gray-800' : 'border-gray-200'
+            darkMode ? 'border-gray-700' : 'border-gray-200'
           }`}>
             <button
               onClick={() => setActiveTab('profile')}
               className={`px-4 py-3 text-center ${
                 activeTab === 'profile'
-                  ? `border-b-2 ${darkMode ? 'border-blue-500 text-blue-500' : 'border-blue-600 text-blue-600'} font-medium`
+                  ? `border-b-2 ${darkMode ? 'border-cyan-500 text-cyan-400' : 'border-cyan-500 text-cyan-600'} font-medium`
                   : `border-b-2 border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
-              }`}
+              } transition-colors`}
             >
               <div className="flex items-center">
                 <User size={16} className="mr-1.5" />
@@ -485,9 +490,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
               onClick={() => setActiveTab('preferences')}
               className={`px-4 py-3 text-center ${
                 activeTab === 'preferences'
-                  ? `border-b-2 ${darkMode ? 'border-blue-500 text-blue-500' : 'border-blue-600 text-blue-600'} font-medium`
+                  ? `border-b-2 ${darkMode ? 'border-cyan-500 text-cyan-400' : 'border-cyan-500 text-cyan-600'} font-medium`
                   : `border-b-2 border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
-              }`}
+              } transition-colors`}
             >
               <div className="flex items-center">
                 <Settings size={16} className="mr-1.5" />
@@ -498,9 +503,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
               onClick={() => setActiveTab('security')}
               className={`px-4 py-3 text-center ${
                 activeTab === 'security'
-                  ? `border-b-2 ${darkMode ? 'border-blue-500 text-blue-500' : 'border-blue-600 text-blue-600'} font-medium`
+                  ? `border-b-2 ${darkMode ? 'border-cyan-500 text-cyan-400' : 'border-cyan-500 text-cyan-600'} font-medium`
                   : `border-b-2 border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
-              }`}
+              } transition-colors`}
             >
               <div className="flex items-center">
                 <Lock size={16} className="mr-1.5" />
@@ -510,12 +515,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
           </div>
           
           {/* Área de conteúdo principal */}
-          <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} p-5 max-h-[60vh] overflow-y-auto`}>
+          <div className={`${darkMode ? 'bg-[#212E3C]' : 'bg-gray-50'} p-5 max-h-[60vh] overflow-y-auto`}>
             {/* Tab de Informações do Perfil */}
             {activeTab === 'profile' && (
               <div>
                 <div className="flex items-center mb-4">
-                  <User size={18} className={`${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-2`} />
+                  <User size={18} className={`${darkMode ? 'text-cyan-400' : 'text-cyan-600'} mr-2`} />
                   <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     Informações do Perfil
                   </h3>
@@ -527,8 +532,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       ID
                     </h4>
                     <p className={darkMode ? 'text-white' : 'text-gray-900'}>
@@ -541,8 +546,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       Estado
                     </h4>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -559,8 +564,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       Nome Completo
                     </h4>
                     <p className={darkMode ? 'text-white' : 'text-gray-900'}>
@@ -573,8 +578,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       Email
                     </h4>
                     <p className={`${darkMode ? 'text-white' : 'text-gray-900'} break-all`}>
@@ -587,14 +592,14 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       Perfil
                     </h4>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       darkMode 
-                        ? 'bg-blue-900/40 text-blue-300 border border-blue-800' 
-                        : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-800' 
+                        : 'bg-cyan-100 text-cyan-800 border border-cyan-200'
                     }`}>
                       {user.perfil}
                     </span>
@@ -605,8 +610,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
+                    } border shadow-sm`}>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-1`}>
                       Autenticação de Dois Fatores
                     </h4>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -615,8 +620,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                           ? 'bg-green-900/40 text-green-300 border border-green-800' 
                           : 'bg-green-100 text-green-800 border border-green-200'
                         : darkMode 
-                          ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-800' 
-                          : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                          ? 'bg-amber-900/40 text-amber-300 border border-amber-800' 
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
                     }`}>
                       {user.dois_fatores_ativo ? 'Ativada' : 'Desativada'}
                     </span>
@@ -627,15 +632,15 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border col-span-2`}>
+                    } border shadow-sm col-span-2`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
-                        <Shield size={16} className={`${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-2`} />
+                        <Shield size={16} className={`${darkMode ? 'text-cyan-400' : 'text-cyan-600'} mr-2`} />
                         <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           Sessões Ativas
                         </h4>
                       </div>
-                      <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                      <span className={`text-sm font-medium ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
                         {sessionsCount}
                       </span>
                     </div>
@@ -647,7 +652,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                           darkMode 
                             ? 'bg-red-900/30 border-red-800 text-red-300 hover:bg-red-900/50' 
                             : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-100'
-                        } border rounded-lg mt-2`}
+                        } border rounded-lg mt-2 transition-colors`}
                       >
                         <LogOut size={14} className="mr-1.5" />
                         Encerrar todas as sessões
@@ -662,7 +667,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
             {activeTab === 'preferences' && (
               <div>
                 <div className="flex items-center mb-4">
-                  <Settings size={18} className={`${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-2`} />
+                  <Settings size={18} className={`${darkMode ? 'text-cyan-400' : 'text-cyan-600'} mr-2`} />
                   <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     Preferências do Sistema
                   </h3>
@@ -674,13 +679,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
+                    } border shadow-sm`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className={`p-2 rounded-full mr-3 ${
-                          darkMode ? 'bg-blue-900/50' : 'bg-blue-100'
+                          darkMode ? 'bg-cyan-900/50' : 'bg-cyan-100'
                         }`}>
-                          <Palette className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                          <Palette className={`h-5 w-5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`} />
                         </div>
                         <div>
                           <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -705,9 +710,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                             darkMode ? 'bg-gray-700' : 'bg-gray-300'
                           } rounded-full peer ${
                             preferences.tema_escuro 
-                              ? darkMode ? 'bg-blue-500' : 'bg-blue-600' 
+                              ? darkMode ? 'bg-cyan-500' : 'bg-cyan-600' 
                               : ''
-                          }`}>
+                          } transition-colors`}>
                             <div className={`absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full transition-all duration-300 ${
                               preferences.tema_escuro ? 'translate-x-5' : ''
                             }`}></div>
@@ -722,13 +727,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
+                    } border shadow-sm`}>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0">
                       <div className="flex items-center">
                         <div className={`p-2 rounded-full mr-3 ${
-                          darkMode ? 'bg-blue-900/50' : 'bg-blue-100'
+                          darkMode ? 'bg-cyan-900/50' : 'bg-cyan-100'
                         }`}>
-                          <Globe className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                          <Globe className={`h-5 w-5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`} />
                         </div>
                         <div>
                           <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -747,9 +752,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                           onChange={handlePreferenceChange}
                           className={`w-full md:w-40 rounded-md border px-3 py-2 ${
                             darkMode 
-                              ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' 
-                              : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600'
-                          } focus:outline-none focus:ring-2 focus:border-transparent`}
+                              ? 'bg-gray-700 border-gray-600 text-white focus:ring-cyan-500' 
+                              : 'bg-white border-gray-300 text-gray-900 focus:ring-cyan-500'
+                          } focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
                         >
                           <option value="pt">Português</option>
                           <option value="en">English</option>
@@ -765,13 +770,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                     darkMode 
                       ? 'bg-gray-800 border-gray-700' 
                       : 'bg-white border-gray-200'
-                    } border`}>
+                    } border shadow-sm`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className={`p-2 rounded-full mr-3 ${
-                          darkMode ? 'bg-blue-900/50' : 'bg-blue-100'
+                          darkMode ? 'bg-cyan-900/50' : 'bg-cyan-100'
                         }`}>
-                          <Bell className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                          <Bell className={`h-5 w-5 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`} />
                         </div>
                         <div>
                           <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -796,9 +801,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                             darkMode ? 'bg-gray-700' : 'bg-gray-300'
                           } rounded-full peer ${
                             preferences.notificacoes 
-                              ? darkMode ? 'bg-blue-500' : 'bg-blue-600' 
+                              ? darkMode ? 'bg-cyan-500' : 'bg-cyan-600' 
                               : ''
-                          }`}>
+                          } transition-colors`}>
                             <div className={`absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full transition-all duration-300 ${
                               preferences.notificacoes ? 'translate-x-5' : ''
                             }`}></div>
@@ -814,8 +819,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                       onClick={savePreferences}
                       disabled={loadingPreferences}
                       className={`px-4 py-2 ${
-                        darkMode ? 'bg-blue-500' : 'bg-blue-600'
-                      } hover:bg-blue-700 text-white rounded-md font-medium flex items-center text-sm`}
+                        darkMode ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-cyan-600 hover:bg-cyan-700'
+                      } text-white rounded-md font-medium flex items-center text-sm transition-colors`}
                     >
                       {loadingPreferences ? (
                         <>
@@ -838,7 +843,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
             {activeTab === 'security' && (
               <div>
                 <div className="flex items-center mb-4">
-                  <Lock size={18} className={`${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-2`} />
+                  <Lock size={18} className={`${darkMode ? 'text-cyan-400' : 'text-cyan-600'} mr-2`} />
                   <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     Alterar Senha
                   </h3>
@@ -848,7 +853,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                   darkMode 
                     ? 'bg-gray-800 border-gray-700' 
                     : 'bg-white border-gray-200'
-                  } border`}>
+                  } border shadow-sm`}>
                   <form onSubmit={changePassword} className="space-y-4 max-w-lg">
                     {/* Senha Atual */}
                     <div>
@@ -873,7 +878,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                               : darkMode ? 'border-gray-600' : 'border-gray-300'
                           } rounded-md ${
                             darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                          } focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors`}
                           placeholder="Digite sua senha atual"
                         />
                         <button
@@ -915,7 +920,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                               : darkMode ? 'border-gray-600' : 'border-gray-300'
                           } rounded-md ${
                             darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                          } focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors`}
                           placeholder="Digite sua nova senha"
                         />
                         <button
@@ -957,7 +962,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                               : darkMode ? 'border-gray-600' : 'border-gray-300'
                           } rounded-md ${
                             darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                          } focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors`}
                           placeholder="Confirme sua nova senha"
                         />
                         <button
@@ -982,8 +987,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                         type="submit"
                         disabled={loadingPassword}
                         className={`w-full px-4 py-2 ${
-                          darkMode ? 'bg-blue-500' : 'bg-blue-600'
-                        } hover:bg-blue-700 text-white rounded-md font-medium flex items-center justify-center text-sm`}
+                          darkMode ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-cyan-600 hover:bg-cyan-700'
+                        } text-white rounded-md font-medium flex items-center justify-center text-sm transition-colors`}
                       >
                         {loadingPassword ? (
                           <>

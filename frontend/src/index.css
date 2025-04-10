@@ -166,10 +166,10 @@
 }
 
 .dark .btn-primary {
-  background: linear-gradient(to right, var(--accent-blue), #0052a3);
+  background: linear-gradient(to right, var(--edp-blue), var(--edp-purple));
   border: none;
 }
 
 .dark .btn-primary:hover {
-  background: linear-gradient(to right, var(--accent-blue-hover), #0060c0);
+  background: linear-gradient(to right, var(--edp-blue-hover), var(--edp-purple-hover));
 }
