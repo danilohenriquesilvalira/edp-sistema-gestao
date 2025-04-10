@@ -276,7 +276,7 @@ const UserManagement: React.FC = () => {
         const auditLogsResponse = await api.getAuditLogs({ limit: 1000 });
         if (auditLogsResponse.data.sucesso) {
           // Mapear campos do backend para o frontend se necessário
-          const logs = auditLogsResponse.data.dados.map(log => ({
+          const logs = auditLogsResponse.data.dados.map((log: any) => ({
             id: log.id,
             acao: log.acao,
             modulo: log.modulo,
@@ -522,7 +522,7 @@ const UserManagement: React.FC = () => {
     const dailyMap = new Map<string, number>();
     logs.forEach(log => {
       // Extrair a data (sem a hora)
-      const date = new Date(log.created_at).toISOString().split('T')[0];
+      const date = new Date(log.created_at || '').toISOString().split('T')[0];
       dailyMap.set(date, (dailyMap.get(date) || 0) + 1);
     });
     
@@ -605,11 +605,15 @@ const UserManagement: React.FC = () => {
           startDate = new Date(0); // início dos tempos
       }
       
-      filtered = filtered.filter(log => new Date(log.created_at) >= startDate);
+      filtered = filtered.filter(log => new Date(log.created_at || '') >= startDate);
     }
     
     // Ordenar por data, mais recentes primeiro
-    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    filtered.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
     
     setAuditLogsFiltered(filtered);
     setAuditLogPage(1); // Reset para a primeira página
@@ -658,7 +662,7 @@ const UserManagement: React.FC = () => {
   };
 
   // Abrir modal de detalhes de auditoria
-  const handleViewAuditDetails = (log: (AuditLog & { parsedDetails: ParsedAuditDetails })) => {
+  const handleViewAuditDetails = (log: AuditLog & { parsedDetails: ParsedAuditDetails }) => {
     console.log("Visualizando detalhes do log:", log);
     setSelectedAuditLog(log);
     setIsAuditDetailModalOpen(true);
@@ -822,9 +826,11 @@ const UserManagement: React.FC = () => {
     );
     
     // Encontrar a atividade mais recente
-    const sortedLogs = [...auditLogs].sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    const sortedLogs = [...auditLogs].sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
     
     return {
       totalLogs: auditLogs.length,
@@ -857,7 +863,7 @@ const UserManagement: React.FC = () => {
     return new Intl.NumberFormat('pt-PT').format(num);
   };
 
-  // Formatar data
+  // Formatar data - corrigido para lidar com undefined
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return 'Data não disponível';
     
@@ -1970,7 +1976,7 @@ const UserManagement: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Usuário:</span>
-                                          <div className="flex items-center">
+                    <div className="flex items-center">
                       <div className="h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-medium mr-2">
                         {usuario_nome ? usuario_nome.charAt(0).toUpperCase() : 'U'}
                       </div>

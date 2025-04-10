@@ -157,27 +157,45 @@ const MainLayout: React.FC = () => {
           relative`}
       >
         {/* Cabeçalho da barra lateral */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className={`flex items-center space-x-2 transition-all duration-300 
-            ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-            <img src="/Logo_EDP.svg" alt="EDP Logo" className="w-6 h-6" />
-            <img src="/name_EDP.svg" alt="EDP Name" className="h-10" />
-          </div>
-          
-          {/* Botão Sidebar Collapse */}
-          <button
-            className="p-2 rounded-md text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 
-              dark:text-cyan-400 dark:hover:text-cyan-300 dark:hover:bg-cyan-900/20
-              transition-colors duration-200"
-            onClick={toggleSidebarCollapse}
-          >
-            {sidebarCollapsed ? 
-              <ChevronsRight className="h-5 w-5" /> : 
-              <ChevronsLeft className="h-5 w-5" />
-            }
-          </button>
-        </div>
-
+<div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+  <div className={`flex items-center transition-all duration-300 
+    ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
+    {/* Removido o space-x-2 e adicionando flexbox customizado */}
+    <div className="flex items-center">
+      <img src="/Logo_EDP.svg" alt="EDP Logo" className="w-6 h-6 mr-0.5" />
+      
+      {/* SVG inline com ajustes de dimensões e posição */}
+      <svg 
+        width="80" 
+        height="28" 
+        viewBox="0 0 241 150" 
+        fill="none" 
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-8 -ml-1 mt-0.5" // Ajustado para ficar mais próximo e alinhado
+      >
+        <path 
+          fillRule="evenodd" 
+          clipRule="evenodd" 
+          d="M66.1996 87.1143C65.2585 92.809 58.1428 105.399 40.4739 105.399C16.8676 105.399 11.864 80.6289 12.45 76.2737L74.4729 76.2506C73.6193 55.8054 59.2031 39.521 38.5345 39.521C17.253 39.521 0 56.7859 0 78.0815C0 99.3783 17.253 116.642 38.5345 116.642C56.7079 116.642 70.7703 104.054 74.4923 87.1143H66.1996ZM36.5391 47.388C49.4208 47.388 58.7337 55.2238 62.0423 67.8881L13.1529 67.8212C16.3119 53.5693 27.5314 47.388 36.5391 47.388ZM202.453 39.4744C181.165 39.4744 163.907 56.7433 163.907 78.0475V150H176.267V106.174C182.41 112.946 192.361 116.619 202.453 116.619C223.742 116.619 241 99.3492 241 78.0475C241 56.7433 223.742 39.4744 202.453 39.4744ZM205.299 107.827C189.079 107.74 176.634 93.9221 176.534 75.2117C176.43 55.5669 190.498 47.337 199.923 47.388C216.09 47.4758 228.957 62.7433 229.052 80.6606C229.141 97.3273 217.594 107.894 205.299 107.827ZM144.891 0V49.9817C138.559 43.0451 128.796 39.4743 118.704 39.4743C97.4165 39.4743 80.1586 56.7433 80.1586 78.0475C80.1586 99.3492 97.4165 116.619 118.704 116.619C139.993 116.619 157.251 99.3492 157.251 78.0475V0H144.891ZM121.116 107.832C104.932 107.745 92.205 92.9611 92.1053 74.7798C92.0019 57.1229 104.363 47.3425 115.74 47.3929C131.943 47.4809 144.529 61.781 144.624 80.2287C144.713 98.8832 131.459 107.899 121.116 107.832Z" 
+          fill={darkMode ? "white" : "#212E3C"} 
+        />
+      </svg>
+    </div>
+  </div>
+  
+  {/* Botão Sidebar Collapse */}
+  <button
+    className="p-2 rounded-md text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 
+      dark:text-cyan-400 dark:hover:text-cyan-300 dark:hover:bg-cyan-900/20
+      transition-colors duration-200"
+    onClick={toggleSidebarCollapse}
+  >
+    {sidebarCollapsed ? 
+      <ChevronsRight className="h-5 w-5" /> : 
+      <ChevronsLeft className="h-5 w-5" />
+    }
+  </button>
+</div>
         {renderNavLinks(sidebarCollapsed)}
         {renderBottomActions(sidebarCollapsed)}
       </div>

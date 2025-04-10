@@ -64,8 +64,8 @@ const lightTheme: ThemeColors = {
     muted: 'text-gray-500',
   },
   border: {
-    normal: 'border-gray-200',
-    subtle: 'border-gray-100',
+    normal: 'border-[#212E3C]', // Alterado de 'border-gray-200'
+    subtle: 'border-[#CBD5E1]', // Alterado de 'border-gray-100'
   },
   accent: {
     purple: 'bg-edp-primary-purple',
