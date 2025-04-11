@@ -11,7 +11,10 @@ import {
   UserCheck, 
   Shield, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  SaveIcon,
+  BadgeCheck,
+  UserPlus 
 } from 'lucide-react';
 import { User } from '@/contexts/AuthContext';
 import axios, { AxiosError } from 'axios';
@@ -33,45 +36,97 @@ interface UserFormData {
   dois_fatores_ativo: boolean;
 }
 
+// Definição do estado inicial do formulário em branco
+const initialFormState: UserFormData = {
+  nome: '',
+  email: '',
+  password: '',
+  perfil: 'Utilizador',
+  estado: 'Ativo',
+  dois_fatores_ativo: false
+};
+
 const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, user }) => {
   const isEditing = !!user;
   
-  const [formData, setFormData] = useState<UserFormData>({
-    nome: '',
-    email: '',
-    password: '',
-    perfil: 'Utilizador',
-    estado: 'Ativo',
-    dois_fatores_ativo: false
-  });
+  // Identificador único para o formulário - forçar reset completo
+  const formId = isEditing ? `edit-user-${user?.id}` : 'new-user-form';
+  
+  // Inicializa com estado vazio para novos usuários ou dados do usuário para edição
+  const [formData, setFormData] = useState<UserFormData>(
+    user ? {
+      nome: user.nome || '',
+      email: user.email || '',
+      password: '',
+      perfil: user.perfil as 'Administrador' | 'Utilizador',
+      estado: user.estado as 'Ativo' | 'Inativo',
+      dois_fatores_ativo: user.dois_fatores_ativo || false
+    } : initialFormState
+  );
   
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formTouched, setFormTouched] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Detectar modo escuro
   useEffect(() => {
-    if (user) {
-      setFormData({
-        nome: user.nome || '',
-        email: user.email || '',
-        password: '',
-        perfil: user.perfil as 'Administrador' | 'Utilizador',
-        estado: user.estado as 'Ativo' | 'Inativo',
-        dois_fatores_ativo: user.dois_fatores_ativo || false
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
+    
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'));
+        }
       });
-    }
+    });
+    
+    observer.observe(document.documentElement, { attributes: true });
+    
+    return () => observer.disconnect();
+  }, []);
 
-    // Quando o modal abrir, adicionar classe para impedir scroll no body
+  // Efeito para gerenciar o formulário quando o modal abre e fecha
+  useEffect(() => {
     if (isOpen) {
+      // Resetar o estado touched a cada abertura
+      setFormTouched(false);
+      
+      // Limpar os erros
+      setErrors({});
+      
+      // IMPORTANTE: Forçar reset do formulário para novos usuários
+      if (!isEditing) {
+        // Reset forçado para garantir que sempre começa vazio
+        setFormData({...initialFormState});
+        
+        // Limpar qualquer valor que possa estar no DOM
+        const emailField = document.getElementById('email');
+        const passwordField = document.getElementById('password');
+        if (emailField) (emailField as HTMLInputElement).value = '';
+        if (passwordField) (passwordField as HTMLInputElement).value = '';
+      } else if (user) {
+        // Se estiver editando, preenche com dados do usuário
+        setFormData({
+          nome: user.nome || '',
+          email: user.email || '',
+          password: '', // Senha sempre vazia na edição
+          perfil: user.perfil as 'Administrador' | 'Utilizador',
+          estado: user.estado as 'Ativo' | 'Inativo',
+          dois_fatores_ativo: user.dois_fatores_ativo || false
+        });
+      }
+      
+      // Adicionar classe para impedir scroll no body
       document.body.classList.add('overflow-hidden');
     }
 
-    // Quando o modal fechar, remover a classe
+    // Quando o modal fechar, limpar formulário e remover a classe
     return () => {
       document.body.classList.remove('overflow-hidden');
     };
-  }, [user, isOpen]);
+  }, [user, isOpen, isEditing]); // Dependências atualizadas
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -194,92 +249,191 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
     }
   };
 
+  // Calcular força da senha
+  const getPasswordStrength = (password: string) => {
+    if (!password) return 0;
+    
+    let strength = 0;
+    // Pelo menos 8 caracteres
+    if (password.length >= 8) strength += 1;
+    // Contém letras minúsculas e maiúsculas
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 1;
+    // Contém números
+    if (/\d/.test(password)) strength += 1;
+    // Contém caracteres especiais
+    if (/[^a-zA-Z0-9]/.test(password)) strength += 1;
+    
+    return strength;
+  };
+
+  // Função para obter descrição da força da senha
+  const getPasswordStrengthLabel = (strength: number) => {
+    switch (strength) {
+      case 0:
+        return 'Muito fraca';
+      case 1:
+        return 'Fraca';
+      case 2:
+        return 'Média';
+      case 3:
+        return 'Forte';
+      case 4:
+        return 'Muito forte';
+      default:
+        return '';
+    }
+  };
+
+  // Função para obter a cor da barra de força da senha
+  const getPasswordStrengthColor = (strength: number, darkMode: boolean) => {
+    switch (strength) {
+      case 0:
+        return darkMode ? 'bg-red-700' : 'bg-red-500';
+      case 1:
+        return darkMode ? 'bg-orange-700' : 'bg-orange-500';
+      case 2:
+        return darkMode ? 'bg-yellow-600' : 'bg-yellow-500';
+      case 3:
+        return darkMode ? 'bg-green-600' : 'bg-green-500';
+      case 4:
+        return darkMode ? 'bg-emerald-600' : 'bg-emerald-500';
+      default:
+        return '';
+    }
+  };
+
+  const passwordStrength = formData.password ? getPasswordStrength(formData.password) : 0;
+
+  // Definir variantes para animações
+  const modalVariants = {
+    hidden: { opacity: 0, scale: 0.95, y: 20 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      y: 0,
+      transition: { 
+        type: "spring", 
+        stiffness: 350, 
+        damping: 30 
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.95, 
+      y: 20,
+      transition: { 
+        duration: 0.2,
+        ease: "easeOut" 
+      }
+    }
+  };
+
+  const overlayVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.2 } },
+    exit: { opacity: 0, transition: { duration: 0.2 } }
+  };
+
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
-          {/* Backdrop com blur */}
+          {/* Backdrop com blur melhorado */}
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={overlayVariants}
             className="fixed inset-0 backdrop-blur-sm"
             aria-hidden="true"
             onClick={onClose}
           >
-            <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-70"></div>
+            <div className="absolute inset-0 bg-black/40 dark:bg-gray-900/80"></div>
           </motion.div>
 
-          {/* Modal */}
+          {/* Modal com design 2025 */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 300, 
-              damping: 30 
-            }}
-            className="relative bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-2xl transform w-full max-w-lg mx-4 my-8"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={modalVariants}
+            className="relative bg-white dark:bg-[#1a2331] rounded-2xl overflow-hidden shadow-2xl transform w-full max-w-lg mx-4 my-8 border border-gray-100 dark:border-gray-700"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header com gradiente */}
-            <div className="relative bg-gradient-to-r from-teal-500 to-cyan-600 dark:from-teal-600 dark:to-cyan-700 px-6 py-5">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-white">
+            {/* Header com gradiente e design moderno */}
+            <div className="relative bg-gradient-to-r from-cyan-700 via-cyan-600 to-blue-700 dark:from-cyan-800 dark:to-blue-800 px-6 py-6">
+              {/* Padrão geométrico para dar textura */}
+              <div className="absolute inset-0 overflow-hidden opacity-20">
+                <svg className="absolute left-0 top-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {[...Array(8)].map((_, i) => (
+                    <polygon
+                      key={i}
+                      points={`${Math.random() * 100},${Math.random() * 100} ${Math.random() * 100},${Math.random() * 100} ${Math.random() * 100},${Math.random() * 100}`}
+                      fill="rgba(255,255,255,0.1)"
+                    />
+                  ))}
+                </svg>
+              </div>
+              
+              <div className="flex justify-between items-center relative z-10">
+                <h3 className="text-xl font-semibold text-white tracking-wide">
                   {isEditing ? 'Editar Utilizador' : 'Novo Utilizador'}
                 </h3>
                 <button
                   type="button"
-                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm"
                   onClick={onClose}
                   aria-label="Fechar"
                 >
                   <X size={20} />
                 </button>
               </div>
-              
-              {/* Indicador visual do tipo de operação */}
-              <div className="absolute -bottom-4 left-0 right-0 flex justify-center">
-                <div className="bg-white dark:bg-gray-800 text-teal-600 dark:text-teal-400 rounded-full px-4 py-1 text-sm font-semibold shadow-md flex items-center space-x-1.5">
-                  {isEditing ? (
-                    <>
-                      <UserCheck size={16} />
-                      <span>Editando Perfil</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserIcon size={16} />
-                      <span>Criando Novo</span>
-                    </>
-                  )}
-                </div>
+            </div>
+            
+            {/* Indicador visual reposicionado e redesenhado */}
+            <div className="relative -mt-4 flex justify-center">
+              <div className="bg-white dark:bg-[#212e42] shadow-lg text-cyan-600 dark:text-cyan-400 rounded-full px-5 py-1.5 text-sm font-medium flex items-center space-x-2 border border-cyan-100 dark:border-cyan-800/30">
+                {isEditing ? (
+                  <>
+                    <UserCheck size={16} />
+                    <span>Editando Perfil</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} />
+                    <span>Criando Novo</span>
+                  </>
+                )}
               </div>
             </div>
             
-            <form onSubmit={handleSubmit} className="mt-4">
-              <div className="px-6 py-4 space-y-5">
+            <form onSubmit={handleSubmit} className="mt-5" autoComplete="off" id={formId} key={formId}>
+              <div className="px-6 py-4 space-y-5 max-h-[60vh] overflow-y-auto">
                 {/* Nome */}
                 <div className="space-y-1.5">
-                  <label htmlFor="nome" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label htmlFor="nome" className="block text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                     Nome
+                    {errors.nome && (
+                      <span className="ml-auto text-xs text-red-500 font-normal">
+                        Campo obrigatório
+                      </span>
+                    )}
                   </label>
-                  <div className={`relative rounded-lg shadow-sm ${
+                  <div className={`relative rounded-xl shadow-sm transition-all duration-200 ${
                     errors.nome 
-                      ? 'ring-2 ring-red-500 dark:ring-red-500' 
+                      ? 'ring-2 ring-red-500/30 dark:ring-red-500/30' 
                       : formData.nome && formTouched 
-                        ? 'ring-2 ring-green-500 dark:ring-green-500' 
-                        : ''
+                        ? 'ring-2 ring-cyan-500/30 dark:ring-cyan-500/30' 
+                        : 'hover:ring-2 hover:ring-cyan-500/20 dark:hover:ring-cyan-500/20'
                   }`}>
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <UserIcon size={18} className={`${
                         errors.nome 
                           ? 'text-red-500' 
                           : formData.nome && formTouched 
-                            ? 'text-green-500' 
+                            ? 'text-cyan-500 dark:text-cyan-400' 
                             : 'text-gray-400 dark:text-gray-500'
                       }`} />
                     </div>
@@ -290,43 +444,38 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                       value={formData.nome}
                       onChange={handleChange}
                       placeholder="Digite o nome completo"
-                      className={`block w-full pl-10 pr-3 py-2.5 border ${
+                      className={`block w-full pl-10 pr-3 py-3 border ${
                         errors.nome 
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
-                          : 'border-gray-300 dark:border-gray-600 focus:ring-teal-500 focus:border-teal-500'
-                      } rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
+                          : 'border-gray-200 dark:border-gray-700 focus:ring-cyan-500 focus:border-cyan-500'
+                      } rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
                     />
-                    {errors.nome && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center mt-1.5"
-                      >
-                        <AlertCircle size={14} className="text-red-500 mr-1.5" />
-                        <p className="text-sm text-red-600 dark:text-red-400">{errors.nome}</p>
-                      </motion.div>
-                    )}
                   </div>
                 </div>
                 
                 {/* Email */}
                 <div className="space-y-1.5">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
                     Email
+                    {errors.email && (
+                      <span className="ml-auto text-xs text-red-500 font-normal">
+                        {errors.email}
+                      </span>
+                    )}
                   </label>
-                  <div className={`relative rounded-lg shadow-sm ${
+                  <div className={`relative rounded-xl shadow-sm transition-all duration-200 ${
                     errors.email 
-                      ? 'ring-2 ring-red-500 dark:ring-red-500' 
+                      ? 'ring-2 ring-red-500/30 dark:ring-red-500/30' 
                       : formData.email && formTouched 
-                        ? 'ring-2 ring-green-500 dark:ring-green-500' 
-                        : ''
+                        ? 'ring-2 ring-cyan-500/30 dark:ring-cyan-500/30' 
+                        : 'hover:ring-2 hover:ring-cyan-500/20 dark:hover:ring-cyan-500/20'
                   }`}>
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Mail size={18} className={`${
                         errors.email 
                           ? 'text-red-500' 
                           : formData.email && formTouched 
-                            ? 'text-green-500' 
+                            ? 'text-cyan-500 dark:text-cyan-400' 
                             : 'text-gray-400 dark:text-gray-500'
                       }`} />
                     </div>
@@ -337,43 +486,39 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="exemplo@dominio.com"
-                      className={`block w-full pl-10 pr-3 py-2.5 border ${
+                      autoComplete="new-email"
+                      className={`block w-full pl-10 pr-3 py-3 border ${
                         errors.email 
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
-                          : 'border-gray-300 dark:border-gray-600 focus:ring-teal-500 focus:border-teal-500'
-                      } rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
+                          : 'border-gray-200 dark:border-gray-700 focus:ring-cyan-500 focus:border-cyan-500'
+                      } rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
                     />
-                    {errors.email && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center mt-1.5"
-                      >
-                        <AlertCircle size={14} className="text-red-500 mr-1.5" />
-                        <p className="text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                      </motion.div>
-                    )}
                   </div>
                 </div>
                 
                 {/* Senha */}
                 <div className="space-y-1.5">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {isEditing ? 'Senha (deixe em branco para manter a atual)' : 'Senha'}
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                    {isEditing ? 'Senha (opcional)' : 'Senha'}
+                    {errors.password && (
+                      <span className="ml-auto text-xs text-red-500 font-normal">
+                        {errors.password}
+                      </span>
+                    )}
                   </label>
-                  <div className={`relative rounded-lg shadow-sm ${
+                  <div className={`relative rounded-xl shadow-sm transition-all duration-200 ${
                     errors.password 
-                      ? 'ring-2 ring-red-500 dark:ring-red-500' 
+                      ? 'ring-2 ring-red-500/30 dark:ring-red-500/30' 
                       : formData.password && formTouched 
-                        ? 'ring-2 ring-green-500 dark:ring-green-500' 
-                        : ''
+                        ? 'ring-2 ring-cyan-500/30 dark:ring-cyan-500/30' 
+                        : 'hover:ring-2 hover:ring-cyan-500/20 dark:hover:ring-cyan-500/20'
                   }`}>
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Lock size={18} className={`${
                         errors.password 
                           ? 'text-red-500' 
                           : formData.password && formTouched 
-                            ? 'text-green-500' 
+                            ? 'text-cyan-500 dark:text-cyan-400' 
                             : 'text-gray-400 dark:text-gray-500'
                       }`} />
                     </div>
@@ -384,11 +529,12 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                       value={formData.password || ''}
                       onChange={handleChange}
                       placeholder={isEditing ? "••••••••••" : "Mínimo 6 caracteres"}
-                      className={`block w-full pl-10 pr-12 py-2.5 border ${
+                      autoComplete="new-password"
+                      className={`block w-full pl-10 pr-12 py-3 border ${
                         errors.password 
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500' 
-                          : 'border-gray-300 dark:border-gray-600 focus:ring-teal-500 focus:border-teal-500'
-                      } rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
+                          : 'border-gray-200 dark:border-gray-700 focus:ring-cyan-500 focus:border-cyan-500'
+                      } rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-all duration-200`}
                     />
                     <button
                       type="button"
@@ -399,48 +545,36 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  {errors.password && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center mt-1.5"
-                    >
-                      <AlertCircle size={14} className="text-red-500 mr-1.5" />
-                      <p className="text-sm text-red-600 dark:text-red-400">{errors.password}</p>
-                    </motion.div>
-                  )}
                   {formData.password && !errors.password && (
                     <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {getPasswordStrengthLabel(passwordStrength)}
+                        </div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {passwordStrength * 25}%
+                        </div>
+                      </div>
                       <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div 
                           className={`h-full transition-all duration-300 ${
-                            formData.password.length < 6 
-                              ? 'bg-red-500 w-1/3' 
-                              : formData.password.length < 10 
-                                ? 'bg-yellow-500 w-2/3' 
-                                : 'bg-green-500 w-full'
+                            getPasswordStrengthColor(passwordStrength, isDarkMode)
                           }`}
+                          style={{ width: `${passwordStrength * 25}%` }}
                         ></div>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {formData.password.length < 6 
-                          ? 'Senha fraca' 
-                          : formData.password.length < 10 
-                            ? 'Senha média' 
-                            : 'Senha forte'}
-                      </p>
                     </div>
                   )}
                 </div>
                 
-                {/* Seletores de Perfil e Estado em flex row */}
+                {/* Seletores de Perfil e Estado em flex row com design melhorado */}
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Perfil */}
                   <div className="flex-1 space-y-1.5">
                     <label htmlFor="perfil" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Perfil
                     </label>
-                    <div className="relative rounded-lg shadow-sm">
+                    <div className="relative rounded-xl shadow-sm hover:ring-2 hover:ring-cyan-500/20 dark:hover:ring-cyan-500/20 transition-all duration-200">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Shield size={18} className="text-gray-400 dark:text-gray-500" />
                       </div>
@@ -449,7 +583,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                         name="perfil"
                         value={formData.perfil}
                         onChange={handleChange}
-                        className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 focus:ring-teal-500 focus:border-teal-500 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 appearance-none"
+                        className="block w-full pl-10 pr-10 py-3 border border-gray-200 dark:border-gray-700 focus:ring-cyan-500 focus:border-cyan-500 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200 appearance-none"
                       >
                         <option value="Administrador">Administrador</option>
                         <option value="Utilizador">Utilizador</option>
@@ -460,11 +594,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                         </svg>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {formData.perfil === 'Administrador' 
-                        ? 'Acesso completo ao sistema' 
-                        : 'Acesso limitado às funções básicas'}
-                    </p>
+                    <div className="mt-1 flex items-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        formData.perfil === 'Administrador'
+                          ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/30'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/30'
+                      }`}>
+                        <BadgeCheck className="w-3 h-3 mr-1" />
+                        {formData.perfil}
+                      </span>
+                    </div>
                   </div>
                   
                   {/* Estado */}
@@ -472,13 +611,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                     <label htmlFor="estado" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Estado
                     </label>
-                    <div className="relative">
+                    <div className="relative rounded-xl hover:ring-2 hover:ring-cyan-500/20 dark:hover:ring-cyan-500/20 transition-all duration-200">
                       <select
                         id="estado"
                         name="estado"
                         value={formData.estado}
                         onChange={handleChange}
-                        className="block w-full py-2.5 pl-3 pr-10 border border-gray-300 dark:border-gray-600 focus:ring-teal-500 focus:border-teal-500 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 appearance-none"
+                        className="block w-full py-3 pl-3 pr-10 border border-gray-200 dark:border-gray-700 focus:ring-cyan-500 focus:border-cyan-500 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200 appearance-none"
                       >
                         <option value="Ativo">Ativo</option>
                         <option value="Inativo">Inativo</option>
@@ -489,19 +628,38 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                         </svg>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {formData.estado === 'Ativo' 
-                        ? 'O utilizador pode aceder ao sistema' 
-                        : 'O utilizador está bloqueado'}
-                    </p>
+                    <div className="mt-1 flex items-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        formData.estado === 'Ativo'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800/30'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800/30'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1 ${
+                          formData.estado === 'Ativo' ? 'bg-green-500' : 'bg-red-500'
+                        }`}></span>
+                        {formData.estado}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
-                {/* Switch de Autenticação de dois fatores */}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                {/* Switch de Autenticação de dois fatores modernizado */}
+                <div className="mt-6">
+                  <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors duration-200
+                    ${isDarkMode 
+                      ? 'bg-[#212e42] border-gray-700 hover:border-cyan-700/50' 
+                      : 'bg-gray-50 border-gray-200 hover:border-cyan-300/50'
+                    }`}
+                  >
                     <div className="flex items-center">
-                      <Shield size={20} className="text-gray-500 dark:text-gray-400 mr-3" />
+                      <div className={`flex items-center justify-center p-2 rounded-lg mr-3 
+                        ${isDarkMode 
+                          ? 'bg-cyan-500/10 text-cyan-400' 
+                          : 'bg-cyan-100 text-cyan-700'
+                        }`}
+                      >
+                        <Shield size={20} />
+                      </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           Autenticação de dois fatores
@@ -521,41 +679,48 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, 
                         onChange={handleChange}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500 dark:peer-checked:bg-teal-600"></div>
+                      <div className="w-12 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600 dark:peer-checked:bg-cyan-600"></div>
                     </label>
                   </div>
                 </div>
               </div>
               
-              {/* Footer com botões em gradiente */}
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
-                <button
+              {/* Footer com botões modernizados e mais sofisticados */}
+              <div className="px-6 py-4 bg-gray-50 dark:bg-[#1a2331] border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3 rounded-b-2xl">
+                <motion.button
                   type="button"
                   onClick={onClose}
-                  className="py-2.5 px-4 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-teal-500 transition-all duration-200"
+                  className="py-2.5 px-5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-cyan-500 transition-all duration-200"
+                  whileHover={{ y: -1 }}
+                  whileTap={{ y: 0 }}
                 >
                   Cancelar
-                </button>
+                </motion.button>
                 
-                <button
+                <motion.button
                   type="submit"
                   disabled={loading}
-                  className={`relative py-2.5 px-6 rounded-lg shadow-sm text-sm font-medium text-white ${
-                    loading ? 'bg-teal-500 dark:bg-teal-600' : 'bg-gradient-to-r from-teal-500 to-cyan-600 dark:from-teal-600 dark:to-cyan-700 hover:from-teal-600 hover:to-cyan-700 dark:hover:from-teal-700 dark:hover:to-cyan-800'
-                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-teal-500 transition-all duration-200 overflow-hidden`}
+                  className={`relative py-2.5 px-6 rounded-xl shadow-md text-sm font-medium text-white ${
+                    loading 
+                      ? 'bg-cyan-600 dark:bg-cyan-700' 
+                      : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-cyan-500 transition-all duration-200 overflow-hidden`}
+                  whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}
+                  whileTap={{ y: 0 }}
                 >
-                  {loading && (
+                  {loading ? (
                     <span className="absolute inset-0 flex items-center justify-center">
                       <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     </span>
-                  )}
+                  ) : null}
                   <span className={loading ? 'opacity-0' : 'opacity-100'}>
+                    <SaveIcon size={16} className="inline-block mr-2 -ml-1" />
                     {isEditing ? 'Atualizar' : 'Criar'} Utilizador
                   </span>
-                </button>
+                </motion.button>
               </div>
             </form>
           </motion.div>
