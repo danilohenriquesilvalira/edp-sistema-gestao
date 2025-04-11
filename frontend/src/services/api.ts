@@ -301,6 +301,22 @@ class ApiService {
     return this.api.delete(`/api/utilizadores/${id}/avatar`);
   }
 
+  // Métodos para o próprio usuário gerenciar sua foto de perfil
+  public async uploadMyProfilePicture(file: File): Promise<AxiosResponse> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    return this.api.post('/api/utilizadores/me/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  }
+
+  public async removeMyProfilePicture(): Promise<AxiosResponse> {
+    return this.api.delete('/api/utilizadores/me/avatar');
+  }
+
   // PASSWORD
   public async forgotPassword(email: string): Promise<AxiosResponse> {
     return this.api.post('/api/password/forgot', { email });

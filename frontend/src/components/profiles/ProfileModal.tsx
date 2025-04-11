@@ -274,12 +274,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   };
   
   const uploadAvatar = async () => {
-    if (!avatarFile || !user) return;
+    if (!avatarFile) return;
     
     setLoadingAvatar(true);
     
     try {
-      const response = await api.uploadProfilePicture(user.id, avatarFile);
+      // Usar a nova rota para upload de avatar do próprio usuário
+      const response = await api.uploadMyProfilePicture(avatarFile);
       
       if (response.data.sucesso) {
         toast.success('Foto de perfil atualizada com sucesso!');
@@ -322,11 +323,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   };
   
   const handleRemoveAvatar = async () => {
-    if (!user) return;
     setLoading(true);
     
     try {
-      const response = await api.removeProfilePicture(user.id);
+      // Usar a nova rota para remover avatar do próprio usuário
+      const response = await api.removeMyProfilePicture();
       
       if (response.data.sucesso) {
         toast.success('Foto de perfil removida com sucesso!');

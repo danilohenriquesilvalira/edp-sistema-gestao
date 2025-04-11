@@ -764,6 +764,222 @@ func RemoveProfilePicture(c *fiber.Ctx) error {
 	})
 }
 
+// UploadMyProfilePicture permite ao utilizador atual fazer upload da sua própria foto de perfil
+func UploadMyProfilePicture(c *fiber.Ctx) error {
+	// Obter ID do utilizador atual
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
+
+	// Verificar se o utilizador existe
+	user, err := models.GetUserByID(userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Utilizador não encontrado",
+		})
+	}
+
+	// Obter o arquivo enviado
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Nenhum arquivo enviado ou formato inválido",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Verificar tamanho do arquivo (limite de 2MB)
+	const maxSize = 2 * 1024 * 1024 // 2MB
+	if file.Size > maxSize {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "O arquivo excede o tamanho máximo permitido de 2MB",
+		})
+	}
+
+	// Verificar tipo de arquivo (aceitar apenas imagens)
+	contentType := file.Header.Get("Content-Type")
+	validTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/gif":  true,
+		"image/webp": true,
+	}
+
+	if !validTypes[contentType] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "O arquivo deve ser uma imagem (JPEG, PNG, GIF ou WebP)",
+		})
+	}
+
+	// Obter e validar extensão do arquivo
+	fileExt := strings.ToLower(filepath.Ext(file.Filename))
+	validExts := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".webp": true,
+	}
+
+	if !validExts[fileExt] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Extensão de arquivo inválida. Permitidas: JPG, JPEG, PNG, GIF, WebP",
+		})
+	}
+
+	// Criar diretório de uploads se não existir
+	uploadDir := "./uploads/avatars"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao criar diretório de uploads",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Gerar nome de arquivo seguro (evitar path traversal)
+	timestamp := time.Now().Unix()
+	safeFileName := fmt.Sprintf("user_%d_%d%s", userID, timestamp, fileExt)
+	filePath := filepath.Join(uploadDir, safeFileName)
+
+	// Remover foto anterior, se existir
+	if user.FotoPerfil != "" && strings.HasPrefix(user.FotoPerfil, "/uploads/") {
+		oldFilePath := "." + user.FotoPerfil
+		// Ignorar erros na remoção do arquivo antigo
+		_ = os.Remove(oldFilePath)
+	}
+
+	// Salvar arquivo
+	if err := saveFile(file, filePath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao salvar arquivo",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Atualizar caminho da foto no banco de dados
+	relativePath := "/uploads/avatars/" + safeFileName
+	user.FotoPerfil = relativePath
+	if err := config.DB.Save(&user).Error; err != nil {
+		// Remover arquivo se houver erro ao atualizar o banco
+		os.Remove(filePath)
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao atualizar foto de perfil no banco de dados",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Registrar log de auditoria
+	userName := c.Locals("user_name").(string)
+
+	models.RegistrarAuditoria(
+		userID,
+		userName,
+		"Atualizar Foto",
+		"Utilizadores",
+		c.IP(),
+		map[string]interface{}{
+			"id":          user.ID,
+			"nome":        user.Nome,
+			"foto_perfil": relativePath,
+		},
+	)
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"sucesso":     true,
+		"mensagem":    "Foto de perfil atualizada com sucesso",
+		"foto_perfil": relativePath,
+	})
+}
+
+// RemoveMyProfilePicture permite ao utilizador atual remover sua própria foto de perfil
+func RemoveMyProfilePicture(c *fiber.Ctx) error {
+	// Obter ID do utilizador atual
+	userIDValue := c.Locals("user_id")
+	if userIDValue == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Usuário não autenticado",
+		})
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro interno no processamento da identidade do usuário",
+		})
+	}
+
+	// Verificar se o utilizador existe
+	var user models.Utilizador
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Utilizador não encontrado",
+		})
+	}
+
+	// Remover foto de perfil, se existir
+	if user.FotoPerfil != "" && strings.HasPrefix(user.FotoPerfil, "/uploads/") {
+		oldFilePath := "." + user.FotoPerfil
+		if err := os.Remove(oldFilePath); err != nil {
+			// Apenas logamos o erro, não interrompemos o fluxo
+			log.Printf("Erro ao remover arquivo: %v", err)
+		}
+	}
+
+	// Atualizar banco de dados
+	user.FotoPerfil = ""
+	if err := config.DB.Save(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"sucesso":  false,
+			"mensagem": "Erro ao atualizar utilizador",
+			"erro":     err.Error(),
+		})
+	}
+
+	// Registrar log de auditoria
+	userName := c.Locals("user_name").(string)
+
+	models.RegistrarAuditoria(
+		userID,
+		userName,
+		"Remover Foto",
+		"Utilizadores",
+		c.IP(),
+		map[string]interface{}{
+			"id":   user.ID,
+			"nome": user.Nome,
+		},
+	)
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"sucesso":  true,
+		"mensagem": "Foto de perfil removida com sucesso",
+	})
+}
+
 // Funções auxiliares
 
 // saveFile salva um arquivo no sistema de arquivos de forma segura

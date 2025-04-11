@@ -60,6 +60,9 @@ func SetupPasswordRoutes(router fiber.Router) {
 func SetupUserRoutes(router fiber.Router) {
 	// Rotas disponíveis para todos os utilizadores autenticados
 	router.Get("/me", controllers.GetCurrentUser)
+	// Adicionar rotas para gerenciar a própria foto de perfil
+	router.Post("/me/avatar", controllers.UploadMyProfilePicture)
+	router.Delete("/me/avatar", controllers.RemoveMyProfilePicture)
 
 	// Rotas que requerem permissão de administrador
 	adminRouter := router.Group("/", middleware.AdminOnlyMiddleware())
