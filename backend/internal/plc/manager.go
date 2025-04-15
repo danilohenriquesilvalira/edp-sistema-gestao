@@ -37,6 +37,7 @@ func (m *Manager) Initialize(app *fiber.App) error {
 
 	// Inicializar hub WebSocket
 	m.wsHub = NewWSHub()
+	m.wsHub.SetPLCManager(m) // Passa o gerenciador PLC para o hub
 	go m.wsHub.Run()
 
 	// Configurar rotas WebSocket
