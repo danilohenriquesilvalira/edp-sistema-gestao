@@ -159,8 +159,6 @@ func (m *Manager) loadTags(plc *PLC) error {
 	return nil
 }
 
-// O resto do arquivo manager.go continua o mesmo...
-
 // startAll inicializa conexões com todos os PLCs e inicia coleta de dados
 func (m *Manager) startAll() {
 	m.mutex.RLock()
@@ -295,7 +293,7 @@ func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 			if err != nil {
 				tag.UltimoErro = err.Error()
 				tag.UltimoErroTime = time.Now()
-				log.Printf("Erro ao ler tag %s do PLC %s: %v", tag.Nome, plc.Nome, err)
+				fmt.Printf("\033[31m[ERRO] PLC %s - Tag %s: %v\033[0m\n", plc.Nome, tag.Nome, err)
 				continue
 			}
 
@@ -305,6 +303,35 @@ func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 			// Publicar apenas se o valor mudou ou não estamos publicando apenas em mudanças
 			if !tag.OnlyOnChange || valueChanged {
 				tag.UltimoValor = value
+
+				// Apresentar o valor no terminal de forma clara
+				// Usar cores para melhor visualização
+				tagInfo := ""
+				if tag.Subsistema != nil {
+					tagInfo = fmt.Sprintf("%s.", *tag.Subsistema)
+				}
+
+				// Cor para valores diferentes tipos
+				var valueStr string
+				switch v := value.(type) {
+				case bool:
+					if v {
+						valueStr = fmt.Sprintf("\033[32m%v\033[0m", v) // Verde para true
+					} else {
+						valueStr = fmt.Sprintf("\033[31m%v\033[0m", v) // Vermelho para false
+					}
+				case float32, float64:
+					valueStr = fmt.Sprintf("\033[36m%.2f\033[0m", v) // Ciano para floats
+				case int, int16, int32, int64, uint, uint16, uint32, uint64:
+					valueStr = fmt.Sprintf("\033[33m%v\033[0m", v) // Amarelo para inteiros
+				case string:
+					valueStr = fmt.Sprintf("\033[35m\"%s\"\033[0m", v) // Roxo para strings
+				default:
+					valueStr = fmt.Sprintf("%v", v)
+				}
+
+				fmt.Printf("\033[1m[PLC]\033[0m \033[34m%s\033[0m - \033[36m%s%s\033[0m: %s\n",
+					plc.Nome, tagInfo, tag.Nome, valueStr)
 
 				// Publicar no Redis
 				m.publishTagValue(plc, tag, value)

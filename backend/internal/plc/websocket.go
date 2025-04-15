@@ -2,6 +2,7 @@ package plc
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 
@@ -46,11 +47,13 @@ func NewWSHub() *WSHub {
 
 // Run inicia o hub WebSocket
 func (h *WSHub) Run() {
+	log.Println("[WebSocket] Hub iniciado e pronto para receber conexões")
 	for {
 		select {
 		case <-h.stopChan:
 			// Fecha todas as conexões de cliente
 			h.mutex.Lock()
+			log.Println("[WebSocket] Parando hub e fechando todas as conexões")
 			for client := range h.clients {
 				close(client.send)
 				delete(h.clients, client)
@@ -62,26 +65,33 @@ func (h *WSHub) Run() {
 			h.mutex.Lock()
 			h.clients[client] = true
 			h.mutex.Unlock()
+			log.Printf("[WebSocket] Novo cliente registrado: %s (total: %d)", client.clientID, len(h.clients))
 
 		case client := <-h.unregister:
 			h.mutex.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
+				log.Printf("[WebSocket] Cliente desconectado: %s (total: %d)", client.clientID, len(h.clients))
 			}
 			h.mutex.Unlock()
 
 		case message := <-h.broadcast:
 			h.mutex.RLock()
+			clientCount := len(h.clients)
+			sentCount := 0
 			for client := range h.clients {
 				select {
 				case client.send <- message:
+					sentCount++
 				default:
 					close(client.send)
 					delete(h.clients, client)
+					log.Printf("[WebSocket] Cliente removido por não responder: %s", client.clientID)
 				}
 			}
 			h.mutex.RUnlock()
+			log.Printf("[WebSocket] Mensagem enviada para %d/%d clientes", sentCount, clientCount)
 		}
 	}
 }
@@ -90,15 +100,25 @@ func (h *WSHub) Run() {
 func (h *WSHub) Broadcast(message WSMessage) {
 	jsonMsg, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("Erro ao serializar mensagem WebSocket: %v", err)
+		log.Printf("[WebSocket] Erro ao serializar mensagem: %v", err)
 		return
 	}
 
-	h.broadcast <- jsonMsg
+	h.mutex.RLock()
+	clientCount := len(h.clients)
+	h.mutex.RUnlock()
+
+	if clientCount > 0 {
+		h.broadcast <- jsonMsg
+		log.Printf("[WebSocket] Mensagem '%s' enviada para broadcast (%d clientes)", message.Type, clientCount)
+	} else {
+		log.Printf("[WebSocket] Nenhum cliente conectado, mensagem '%s' descartada", message.Type)
+	}
 }
 
 // Stop para o hub WebSocket
 func (h *WSHub) Stop() {
+	log.Println("[WebSocket] Solicitação para parar o hub recebida")
 	close(h.stopChan)
 }
 
@@ -106,8 +126,10 @@ func (h *WSHub) Stop() {
 func (h *WSHub) HandleWebSocket(c *websocket.Conn) {
 	clientID := c.Query("client_id")
 	if clientID == "" {
-		clientID = "anonimo"
+		clientID = fmt.Sprintf("anônimo-%p", c)
 	}
+
+	log.Printf("[WebSocket] Nova conexão recebida: %s", clientID)
 
 	client := &WSClient{
 		hub:      h,
@@ -128,49 +150,72 @@ func (c *WSClient) readPump() {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
+		log.Printf("[WebSocket] readPump encerrado para cliente: %s", c.clientID)
 	}()
 
 	for {
-		_, _, err := c.conn.ReadMessage()
+		messageType, message, err := c.conn.ReadMessage()
 		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("[WebSocket] Erro na leitura do cliente %s: %v", c.clientID, err)
+			} else {
+				log.Printf("[WebSocket] Cliente %s fechou a conexão: %v", c.clientID, err)
+			}
 			break
 		}
 
-		// Não estamos processando mensagens recebidas por enquanto
+		log.Printf("[WebSocket] Mensagem recebida do cliente %s: tipo=%d, conteúdo=%s",
+			c.clientID, messageType, string(message))
+
+		// Aqui você pode processar a mensagem recebida do cliente se necessário
 	}
 }
 
 // writePump escreve mensagens na conexão WebSocket
 func (c *WSClient) writePump() {
-	defer c.conn.Close()
+	defer func() {
+		c.conn.Close()
+		log.Printf("[WebSocket] writePump encerrado para cliente: %s", c.clientID)
+	}()
 
 	for {
 		message, ok := <-c.send
 		if !ok {
 			// Canal fechado
+			log.Printf("[WebSocket] Canal de envio fechado para cliente: %s", c.clientID)
 			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 			return
 		}
 
 		err := c.conn.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
-			log.Printf("Erro ao escrever no WebSocket: %v", err)
+			log.Printf("[WebSocket] Erro ao enviar mensagem para cliente %s: %v", c.clientID, err)
 			return
 		}
+
+		// Descomente se quiser ver o conteúdo das mensagens enviadas
+		// log.Printf("[WebSocket] Mensagem enviada para cliente %s: %s", c.clientID, string(message))
 	}
 }
 
 // SetupWebSocketRoutes configura a rota WebSocket
 func SetupWebSocketRoutes(app *fiber.App, hub *WSHub) {
+	log.Println("[WebSocket] Configurando rotas WebSocket em /ws")
+
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		// Verificar se o cliente solicita upgrade para WebSocket
 		if websocket.IsWebSocketUpgrade(c) {
+			log.Printf("[WebSocket] Solicitação de upgrade para WebSocket recebida de %s", c.IP())
 			return c.Next()
 		}
+		log.Printf("[WebSocket] Solicitação rejeitada de %s - upgrade necessário", c.IP())
 		return c.Status(fiber.StatusUpgradeRequired).SendString("Upgrade necessário para WebSocket")
 	})
 
 	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
+		log.Printf("[WebSocket] Conexão estabelecida com %s", c.RemoteAddr().String())
 		hub.HandleWebSocket(c)
 	}))
+
+	log.Println("[WebSocket] Rotas WebSocket configuradas com sucesso")
 }
