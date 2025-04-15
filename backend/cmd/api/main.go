@@ -3,9 +3,12 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/danilo/edp_gestao_utilizadores/internal/config"
 	"github.com/danilo/edp_gestao_utilizadores/internal/models"
+	"github.com/danilo/edp_gestao_utilizadores/internal/plc"
 	"github.com/danilo/edp_gestao_utilizadores/internal/routes"
 	"github.com/danilo/edp_gestao_utilizadores/internal/tasks"
 	"github.com/danilo/edp_gestao_utilizadores/internal/utils"
@@ -33,6 +36,8 @@ func main() {
 	err := config.DB.AutoMigrate(
 		&models.StatusUtilizador{},
 		&models.PreferenciasUtilizador{},
+		&plc.PLC{},
+		&plc.Tag{},
 	)
 
 	if err != nil {
@@ -84,8 +89,34 @@ func main() {
 		})
 	})
 
+	// Inicializar gerenciador PLC
+	log.Println("Inicializando gerenciador PLC...")
+	plcManager := plc.NewManager()
+	if err := plcManager.Initialize(app); err != nil {
+		log.Printf("Aviso: Falha ao inicializar gerenciador PLC: %v", err)
+	} else {
+		log.Println("Gerenciador PLC inicializado com sucesso")
+	}
+
 	// Configurar grupos de rotas
-	routes.SetupRoutes(app)
+	routes.SetupRoutes(app, plcManager)
+
+	// Configurar sinal para encerramento gracioso
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Println("Servidor recebeu sinal de encerramento")
+
+		// Parar o gerenciador PLC
+		if plcManager != nil {
+			log.Println("Desligando gerenciador PLC...")
+			plcManager.Stop()
+		}
+
+		log.Println("Servidor encerrado com sucesso")
+		os.Exit(0)
+	}()
 
 	// Iniciar servidor
 	host := os.Getenv("HOST")

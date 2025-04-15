@@ -3,11 +3,12 @@ package routes
 import (
 	"github.com/danilo/edp_gestao_utilizadores/internal/controllers"
 	"github.com/danilo/edp_gestao_utilizadores/internal/middleware"
+	"github.com/danilo/edp_gestao_utilizadores/internal/plc"
 	"github.com/gofiber/fiber/v2"
 )
 
 // SetupRoutes configura todas as rotas da aplicação
-func SetupRoutes(app *fiber.App) {
+func SetupRoutes(app *fiber.App, plcManager *plc.Manager) {
 	// API grupo
 	api := app.Group("/api")
 
@@ -39,6 +40,10 @@ func SetupRoutes(app *fiber.App) {
 	SetupStatusRoutes(protected.Group("/status"))
 	SetupPreferencesRoutes(protected.Group("/preferencias"))
 	SetupSessionRoutes(protected.Group("/sessoes"))
+
+	// Rotas PLC (requer autenticação e permissão de admin)
+	adminRouter := protected.Group("/", middleware.AdminOnlyMiddleware())
+	SetupPLCRoutes(adminRouter.Group("/plc"), plcManager)
 }
 
 // SetupAuthRoutes configura as rotas de autenticação
