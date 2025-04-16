@@ -38,6 +38,11 @@ func main() {
 		&models.PreferenciasUtilizador{},
 		&plc.PLC{},
 		&plc.Tag{},
+		// Novas tabelas para sistema de falhas
+		&plc.FaultDefinition{},
+		&plc.FaultStatus{},
+		&plc.FaultHistory{},
+		&plc.WordMonitor{},
 	)
 
 	if err != nil {
@@ -70,7 +75,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(recover.New())
 
-	// Correção da configuração CORS
+	// Configuração CORS
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173, http://127.0.0.1:5173",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
@@ -118,6 +123,9 @@ func main() {
 				"tag_updates": "plc.tags.updates",
 				"plc_updates": "plc.updates",
 				"tag_write":   "plc.tags.write",
+				// Novos tópicos para falhas
+				"fault_updates": "eclusa.falhas",
+				"fault_ack":     "eclusa.falhas.reconhecidas",
 			},
 		})
 	})

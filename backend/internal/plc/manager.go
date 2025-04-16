@@ -10,17 +10,19 @@ import (
 	"time"
 
 	"github.com/danilo/edp_gestao_utilizadores/internal/config"
+	"github.com/danilo/edp_gestao_utilizadores/internal/models"
 	"github.com/gofiber/fiber/v2"
 )
 
 // Manager gerencia conexões PLC e coleta de dados
 type Manager struct {
-	plcs        map[uint]*PLC
-	redisClient *RedisClient
-	natsClient  *NatsClient // Cliente NATS para comunicação em tempo real
-	stopChan    chan struct{}
-	wg          sync.WaitGroup
-	mutex       sync.RWMutex
+	plcs         map[uint]*PLC
+	redisClient  *RedisClient
+	natsClient   *NatsClient   // Cliente NATS para comunicação em tempo real
+	faultManager *FaultManager // Novo: Gerenciador de falhas
+	stopChan     chan struct{}
+	wg           sync.WaitGroup
+	mutex        sync.RWMutex
 }
 
 // NewManager cria um novo gerenciador PLC
@@ -52,6 +54,12 @@ func (m *Manager) Initialize(app *fiber.App) error {
 		// Continuar mesmo com falha, pois o NATS tentará reconectar automaticamente
 	}
 
+	// Novo: Inicializar e configurar o gerenciador de falhas
+	m.faultManager = NewFaultManager()
+	if err := m.faultManager.Initialize(m.natsClient); err != nil {
+		log.Printf("Aviso: Falha ao inicializar gerenciador de falhas: %v", err)
+	}
+
 	// Carregar PLCs do banco de dados
 	err := m.loadPLCs()
 	if err != nil {
@@ -62,6 +70,11 @@ func (m *Manager) Initialize(app *fiber.App) error {
 	m.startAll()
 
 	return nil
+}
+
+// GetFaultManager retorna o gerenciador de falhas
+func (m *Manager) GetFaultManager() *FaultManager {
+	return m.faultManager
 }
 
 // loadPLCs consulta o banco de dados para PLCs e suas tags
@@ -133,15 +146,24 @@ func (m *Manager) loadTags(plc *PLC) error {
 		var tag Tag
 		var subsistema sql.NullString
 		var descricao sql.NullString
+		var bitOffset sql.NullInt32
 
 		err := rows.Scan(
 			&tag.ID, &tag.PLCID, &tag.Nome, &tag.DBNumber,
-			&tag.ByteOffset, &tag.BitOffset, &tag.Tipo,
+			&tag.ByteOffset, &bitOffset, &tag.Tipo,
 			&tag.Tamanho, &subsistema, &descricao,
 			&tag.Ativo, &tag.UpdateInterval, &tag.OnlyOnChange,
 		)
 		if err != nil {
 			return err
+		}
+
+		// Converter bitOffset de NullInt32 para ponteiro *int
+		if bitOffset.Valid {
+			bitOffsetValue := int(bitOffset.Int32)
+			tag.BitOffset = &bitOffsetValue
+		} else {
+			tag.BitOffset = nil
 		}
 
 		// Converter o valor NULL ou string para a estrutura
@@ -209,6 +231,12 @@ func (m *Manager) startPLC(plc *PLC) {
 		select {
 		case <-plcStopChan:
 			client.Disconnect()
+
+			// Novo: Parar monitoramento de falhas
+			if m.faultManager != nil {
+				m.faultManager.StopMonitoring(plc.ID)
+			}
+
 			return
 		default:
 			err := client.Connect()
@@ -240,6 +268,11 @@ func (m *Manager) startPLC(plc *PLC) {
 				go m.readTag(plc, &plc.Tags[i], tagStopChans[i])
 			}
 
+			// Novo: Iniciar monitoramento de falhas
+			if m.faultManager != nil {
+				m.faultManager.StartMonitoring(plc)
+			}
+
 			// Monitorar conexão
 			for {
 				select {
@@ -249,6 +282,12 @@ func (m *Manager) startPLC(plc *PLC) {
 						close(ch)
 					}
 					client.Disconnect()
+
+					// Novo: Parar monitoramento de falhas
+					if m.faultManager != nil {
+						m.faultManager.StopMonitoring(plc.ID)
+					}
+
 					return
 				case <-time.After(30 * time.Second):
 					// Verificação periódica de conexão
@@ -259,6 +298,11 @@ func (m *Manager) startPLC(plc *PLC) {
 						// Fechar todos os canais de parada de tag
 						for _, ch := range tagStopChans {
 							close(ch)
+						}
+
+						// Novo: Parar monitoramento de falhas
+						if m.faultManager != nil {
+							m.faultManager.StopMonitoring(plc.ID)
 						}
 
 						// Publicar status de conexão
@@ -497,12 +541,23 @@ func (m *Manager) RemovePLC(id uint) {
 			s7Client.Disconnect()
 		}
 
+		// Parar monitoramento de falhas
+		if m.faultManager != nil {
+			m.faultManager.StopMonitoring(id)
+		}
+
 		log.Printf("PLC removido do gerenciador: %s (ID: %d)", plc.Nome, plc.ID)
 	}
 }
 
 // RestartPLC reinicia a conexão com um PLC
 func (m *Manager) RestartPLC(plc *PLC) {
+	// Primeiro paramos o monitoramento de falhas
+	if m.faultManager != nil {
+		m.faultManager.StopMonitoring(plc.ID)
+	}
+
+	// Depois removemos e adicionamos o PLC novamente
 	m.RemovePLC(plc.ID)
 	m.AddPLC(plc)
 }
@@ -654,6 +709,22 @@ func (m *Manager) WriteTag(plcID uint, tagID uint, value interface{}) error {
 			log.Printf("Falha ao publicar valor escrito da tag no NATS: %v", err)
 		}
 	}
+
+	// Registrar ação no log de auditoria
+	models.RegistrarAuditoria(
+		0, // Usuário não autenticado ou sistema
+		"Sistema",
+		"Escrever",
+		"Tag",
+		"NATS",
+		map[string]interface{}{
+			"plc_id":    plcID,
+			"tag_id":    tagID,
+			"tag_nome":  tagToWrite.Nome,
+			"valor":     value,
+			"timestamp": time.Now(),
+		},
+	)
 
 	return nil
 }

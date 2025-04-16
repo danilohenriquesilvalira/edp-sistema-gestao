@@ -44,6 +44,10 @@ func SetupRoutes(app *fiber.App, plcManager *plc.Manager) {
 	// Rotas PLC (requer autenticação e permissão de admin)
 	adminRouter := protected.Group("/", middleware.AdminOnlyMiddleware())
 	SetupPLCRoutes(adminRouter.Group("/plc"), plcManager)
+
+	// Novo: Rotas para o sistema de falhas
+	faultManager := plcManager.GetFaultManager()
+	setupFaultRoutes(protected.Group("/falhas"), plcManager, faultManager)
 }
 
 // SetupAuthRoutes configura as rotas de autenticação
@@ -151,4 +155,30 @@ func SetupSessionRoutes(router fiber.Router) {
 	router.Get("/:id", controllers.GetUserSessions)
 	router.Delete("/:id", controllers.TerminateSession)
 	router.Delete("/utilizador/:id", controllers.TerminateAllUserSessions)
+}
+
+// setupFaultRoutes configura as rotas para gerenciamento de falhas
+// Nota: Função com inicial minúscula para que não seja exportada e evitar conflito
+func setupFaultRoutes(router fiber.Router, manager *plc.Manager, faultManager *plc.FaultManager) {
+	controller := plc.NewFaultController(manager, faultManager)
+
+	// Rotas para visualização (disponíveis para todos os usuários autenticados)
+	router.Get("/ativas", controller.GetActiveFaults)
+	router.Get("/historico", controller.GetFaultHistory)
+	router.Post("/reconhecer/:id", controller.AcknowledgeFault)
+
+	// Rotas para metadados
+	router.Get("/eclusas", controller.GetEclusasList)
+	router.Get("/subsistemas", controller.GetSubsistemasList)
+
+	// Rotas para administração (requerem permissão de administrador)
+	adminRouter := router.Group("/admin", middleware.AdminOnlyMiddleware())
+
+	// Rotas para definições de falhas
+	adminRouter.Get("/definicoes", controller.GetAllFaultDefinitions)
+	adminRouter.Get("/definicoes/:id", controller.GetFaultDefinitionByID)
+	adminRouter.Post("/definicoes", controller.CreateFaultDefinition)
+	adminRouter.Put("/definicoes/:id", controller.UpdateFaultDefinition)
+	adminRouter.Delete("/definicoes/:id", controller.DeleteFaultDefinition)
+	adminRouter.Post("/definicoes/importar", controller.ImportFaultDefinitions)
 }
