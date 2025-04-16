@@ -1,3 +1,4 @@
+// frontend/src/components/layout/MainLayout.tsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +20,10 @@ import {
   UserCircle,
   Shield,
   Sparkles,
+  Server,
+  Tag,
+  AlertTriangle,
+  DatabaseBackup,
 } from 'lucide-react';
 import ProfileModal from '@/components/profiles/ProfileModal';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -93,6 +98,42 @@ const MainLayout: React.FC = () => {
             )}
           </NavLink>
 
+          {/* PLC Navigation Link */}
+          <NavLink
+            to="/plcs"
+            className={({ isActive }) =>
+              `group flex items-center px-3 py-3 rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-cyan-500 text-white dark:bg-cyan-600 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+              } ${collapsed ? 'justify-center' : ''}`
+            }
+            title="PLCs"
+          >
+            <Server className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'}`} />
+            {!collapsed && (
+              <span className="ml-3 font-medium transition-opacity duration-200">PLCs</span>
+            )}
+          </NavLink>
+
+          {/* Falhas Navigation Link */}
+          <NavLink
+            to="/falhas"
+            className={({ isActive }) =>
+              `group flex items-center px-3 py-3 rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-cyan-500 text-white dark:bg-cyan-600 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+              } ${collapsed ? 'justify-center' : ''}`
+            }
+            title="Falhas"
+          >
+            <AlertTriangle className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'}`} />
+            {!collapsed && (
+              <span className="ml-3 font-medium transition-opacity duration-200">Falhas</span>
+            )}
+          </NavLink>
+
           {user?.perfil === 'Administrador' && (
             <NavLink
               to="/utilizadores"
@@ -125,17 +166,61 @@ const MainLayout: React.FC = () => {
           {!collapsed && 'Sistema'}
         </h2>
         <nav className="space-y-1">
-          <button
-            className={`flex items-center px-3 py-3 rounded-lg w-full transition-all duration-200
-              text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30
-              ${collapsed ? 'justify-center' : ''}`}
+          {/* Administration navigation links */}
+          {user?.perfil === 'Administrador' && (
+            <>
+              <NavLink
+                to="/auditoria"
+                className={({ isActive }) =>
+                  `group flex items-center px-3 py-3 rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? 'bg-cyan-500 text-white dark:bg-cyan-600 dark:text-white'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+                  } ${collapsed ? 'justify-center' : ''}`
+                }
+                title="Auditoria"
+              >
+                <DatabaseBackup className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'}`} />
+                {!collapsed && (
+                  <span className="ml-3 font-medium transition-opacity duration-200">Auditoria</span>
+                )}
+              </NavLink>
+
+              <NavLink
+                to="/permissoes"
+                className={({ isActive }) =>
+                  `group flex items-center px-3 py-3 rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? 'bg-cyan-500 text-white dark:bg-cyan-600 dark:text-white'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+                  } ${collapsed ? 'justify-center' : ''}`
+                }
+                title="Permissões"
+              >
+                <Shield className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'}`} />
+                {!collapsed && (
+                  <span className="ml-3 font-medium transition-opacity duration-200">Permissões</span>
+                )}
+              </NavLink>
+            </>
+          )}
+
+          <NavLink
+            to="/configuracoes"
+            className={({ isActive }) =>
+              `group flex items-center px-3 py-3 rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-cyan-500 text-white dark:bg-cyan-600 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+              } ${collapsed ? 'justify-center' : ''}`
+            }
             title="Configurações"
           >
             <Settings className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'}`} />
             {!collapsed && (
               <span className="ml-3 font-medium transition-opacity duration-200">Configurações</span>
             )}
-          </button>
+          </NavLink>
         </nav>
       </div>
     </div>
@@ -323,7 +408,7 @@ const MainLayout: React.FC = () => {
                           animate={{ opacity: 1 }}
                           transition={{ duration: 0.3 }}
                         >
-                          <span className="text-white font-medium">{user?.nome.charAt(0).toUpperCase()}</span>
+                          <span className="text-white font-medium">{user?.nome?.charAt(0).toUpperCase()}</span>
                         </motion.div>
                       )}
                     </div>
@@ -376,7 +461,7 @@ const MainLayout: React.FC = () => {
                                   />
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-cyan-500 to-blue-600 dark:from-cyan-600 dark:to-blue-700 flex items-center justify-center">
-                                    <span className="text-white text-lg font-medium">{user?.nome.charAt(0).toUpperCase()}</span>
+                                    <span className="text-white text-lg font-medium">{user?.nome?.charAt(0).toUpperCase()}</span>
                                   </div>
                                 )}
                               </motion.div>

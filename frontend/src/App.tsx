@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import React, { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
@@ -27,6 +28,20 @@ const AuditLogs = lazy(() => import('@/pages/AuditLogs'));
 const Permissions = lazy(() => import('@/pages/Permissions'));
 const SystemConfig = lazy(() => import('@/pages/SystemConfig'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
+
+// Importação das páginas de PLC
+const PLCListPage = lazy(() => import('@/pages/plc/PLCListPage'));
+const PLCCreatePage = lazy(() => import('@/pages/plc/PLCCreatePage'));
+const PLCEditPage = lazy(() => import('@/pages/plc/PLCEditPage'));
+const PLCDetailsPage = lazy(() => import('@/pages/plc/PLCDetailsPage'));
+const TagCreatePage = lazy(() => import('@/pages/tags/TagCreatePage'));
+const TagEditPage = lazy(() => import('@/pages/tags/TagEditPage'));
+
+// Importação das páginas de Falhas
+const FaultActivePage = lazy(() => import('@/pages/faults/FaultActivePage'));
+const FaultDefinitionsPage = lazy(() => import('@/pages/faults/FaultDefinitionsPage'));
+const FaultDefinitionCreatePage = lazy(() => import('@/pages/faults/FaultDefinitionCreatePage'));
+const FaultDefinitionEditPage = lazy(() => import('@/pages/faults/FaultDefinitionEditPage'));
 
 // Componente de proteção de rotas
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -172,6 +187,68 @@ const AppContent: React.FC = () => {
           <Route path="perfil" element={
             <Suspense fallback={<LoadingPage />}>
               <Profile />
+            </Suspense>
+          } />
+          
+          {/* Rotas de PLC */}
+          <Route path="plcs" element={
+            <Suspense fallback={<LoadingPage />}>
+              <PLCListPage />
+            </Suspense>
+          } />
+          
+          <Route path="plcs/novo" element={
+            <Suspense fallback={<LoadingPage />}>
+              <PLCCreatePage />
+            </Suspense>
+          } />
+          
+          <Route path="plcs/:id" element={
+            <Suspense fallback={<LoadingPage />}>
+              <PLCDetailsPage />
+            </Suspense>
+          } />
+          
+          <Route path="plcs/:id/editar" element={
+            <Suspense fallback={<LoadingPage />}>
+              <PLCEditPage />
+            </Suspense>
+          } />
+          
+          <Route path="plcs/:plcId/tags/nova" element={
+            <Suspense fallback={<LoadingPage />}>
+              <TagCreatePage />
+            </Suspense>
+          } />
+          
+          <Route path="plcs/:plcId/tags/:id/editar" element={
+            <Suspense fallback={<LoadingPage />}>
+              <TagEditPage />
+            </Suspense>
+          } />
+          
+          {/* Rotas de Falhas */}
+          <Route path="falhas" element={
+            <Suspense fallback={<LoadingPage />}>
+              <FaultActivePage />
+            </Suspense>
+          } />
+          
+          <Route path="falhas/definicoes" element={
+            <Suspense fallback={<LoadingPage />}>
+              <FaultDefinitionsPage />
+            </Suspense>
+          } />
+          
+          <Route path="falhas/definicoes/nova" element={
+            <Suspense fallback={<LoadingPage />}>
+              <FaultDefinitionCreatePage />
+            </Suspense>
+          } />
+          
+          <Route path="falhas/definicoes/:id/editar" element={
+            <Suspense fallback={<LoadingPage />}>
+              <FaultDefinitionEditPage />
             </Suspense>
           } />
           
