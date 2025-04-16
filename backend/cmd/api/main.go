@@ -89,6 +89,39 @@ func main() {
 		})
 	})
 
+	// Adicionar endpoint para informações sobre conexão NATS (para clientes)
+	app.Get("/nats-info", func(c *fiber.Ctx) error {
+		natsURL := os.Getenv("NATS_PUBLIC_URL")
+		if natsURL == "" {
+			natsURL = os.Getenv("NATS_URL")
+		}
+		if natsURL == "" {
+			natsURL = "nats://localhost:4222"
+		}
+
+		// Se o URL começar com nats:// e não tivermos um NATS_PUBLIC_URL,
+		// verificar se precisamos converter para ws:// para navegadores
+		if natsURL[:7] == "nats://" && os.Getenv("NATS_PUBLIC_URL") == "" {
+			// Converter para WebSocket para clientes de navegador
+			natsURL = "ws://" + natsURL[7:]
+			// Usar porta 8443 para WebSocket, caso esteja usando a padrão 4222
+			if natsURL[len(natsURL)-5:] == ":4222" {
+				natsURL = natsURL[:len(natsURL)-5] + ":8443"
+			}
+		}
+
+		// Fornecer informações para o frontend se conectar ao NATS
+		return c.JSON(fiber.Map{
+			"url": natsURL,
+			"subjects": map[string]string{
+				"plc_status":  "plc.status",
+				"tag_updates": "plc.tags.updates",
+				"plc_updates": "plc.updates",
+				"tag_write":   "plc.tags.write",
+			},
+		})
+	})
+
 	// Inicializar gerenciador PLC
 	log.Println("Inicializando gerenciador PLC...")
 	plcManager := plc.NewManager()

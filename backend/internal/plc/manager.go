@@ -1,10 +1,11 @@
 package plc
 
 import (
-	"database/sql" // Adicionado para tratar NULL
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 type Manager struct {
 	plcs        map[uint]*PLC
 	redisClient *RedisClient
-	wsHub       *WSHub
+	natsClient  *NatsClient // Cliente NATS para comunicação em tempo real
 	stopChan    chan struct{}
 	wg          sync.WaitGroup
 	mutex       sync.RWMutex
@@ -32,16 +33,24 @@ func NewManager() *Manager {
 
 // Initialize carrega PLCs e tags do banco de dados e inicia conexões
 func (m *Manager) Initialize(app *fiber.App) error {
-	// Inicializar cliente Redis
+	// Inicializar cliente Redis (mantido para compatibilidade com código existente)
 	m.redisClient = NewRedisClient()
 
-	// Inicializar hub WebSocket
-	m.wsHub = NewWSHub()
-	m.wsHub.SetPLCManager(m) // Passa o gerenciador PLC para o hub
-	go m.wsHub.Run()
+	// Inicializar cliente NATS
+	m.natsClient = NewNatsClient()
+	m.natsClient.SetPLCManager(m)
 
-	// Configurar rotas WebSocket
-	SetupWebSocketRoutes(app, m.wsHub)
+	// Obter URL do NATS do ambiente ou usar padrão
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222" // URL padrão
+	}
+
+	// Conectar ao servidor NATS
+	if err := m.natsClient.Connect(natsURL); err != nil {
+		log.Printf("Aviso: Falha ao conectar com servidor NATS: %v", err)
+		// Continuar mesmo com falha, pois o NATS tentará reconectar automaticamente
+	}
 
 	// Carregar PLCs do banco de dados
 	err := m.loadPLCs()
@@ -334,90 +343,93 @@ func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 				fmt.Printf("\033[1m[PLC]\033[0m \033[34m%s\033[0m - \033[36m%s%s\033[0m: %s\n",
 					plc.Nome, tagInfo, tag.Nome, valueStr)
 
-				// Publicar no Redis
+				// Publicar no Redis (mantido para compatibilidade)
 				m.publishTagValue(plc, tag, value)
 
-				// Enviar para clientes WebSocket
-				m.wsHub.Broadcast(WSMessage{
-					Type: "tag_update",
-					Data: map[string]interface{}{
-						"plc_id":    plc.ID,
-						"plc_nome":  plc.Nome,
-						"tag_id":    tag.ID,
-						"tag_nome":  tag.Nome,
-						"valor":     value,
-						"timestamp": tag.UltimaLeitura,
-					},
-				})
+				// Publicar no NATS
+				if m.natsClient != nil && m.natsClient.IsConnected() {
+					if err := m.natsClient.PublishTagValue(plc, tag, value); err != nil {
+						log.Printf("Falha ao publicar valor da tag no NATS: %v", err)
+					}
+				}
 			}
 		}
 	}
 }
 
-// publishPLCStatus publica o status de conexão do PLC no Redis e WebSocket
+// publishPLCStatus publica o status de conexão do PLC via NATS e Redis
 func (m *Manager) publishPLCStatus(plc *PLC) {
-	// Criar dados de status
-	status := map[string]interface{}{
-		"id":          plc.ID,
-		"nome":        plc.Nome,
-		"ip_address":  plc.IPAddress,
-		"conectado":   plc.Conectado,
-		"ultimo_erro": plc.UltimoErro,
-		"timestamp":   time.Now(),
+	// Publicar no NATS
+	if m.natsClient != nil && m.natsClient.IsConnected() {
+		if err := m.natsClient.PublishPLCStatus(plc); err != nil {
+			log.Printf("Falha ao publicar status PLC no NATS: %v", err)
+		}
 	}
 
-	// Converter para JSON
-	statusJSON, err := json.Marshal(status)
-	if err != nil {
-		log.Printf("Falha ao serializar status PLC: %v", err)
-		return
-	}
+	// Manter publicação no Redis para compatibilidade com código existente
+	if m.redisClient != nil {
+		// Criar dados de status
+		status := map[string]interface{}{
+			"id":          plc.ID,
+			"nome":        plc.Nome,
+			"ip_address":  plc.IPAddress,
+			"conectado":   plc.Conectado,
+			"ultimo_erro": plc.UltimoErro,
+			"timestamp":   time.Now(),
+		}
 
-	// Publicar no Redis
-	err = m.redisClient.Publish("plc:status", string(statusJSON))
-	if err != nil {
-		log.Printf("Falha ao publicar status PLC no Redis: %v", err)
-	}
+		// Converter para JSON
+		statusJSON, err := json.Marshal(status)
+		if err != nil {
+			log.Printf("Falha ao serializar status PLC: %v", err)
+			return
+		}
 
-	// Enviar para clientes WebSocket
-	m.wsHub.Broadcast(WSMessage{
-		Type: "plc_status",
-		Data: status,
-	})
+		// Publicar no Redis
+		err = m.redisClient.Publish("plc:status", string(statusJSON))
+		if err != nil {
+			log.Printf("Falha ao publicar status PLC no Redis: %v", err)
+		}
+	}
 }
 
-// publishTagValue publica um valor de tag no Redis e WebSocket
+// publishTagValue publica um valor de tag no Redis e NATS
 func (m *Manager) publishTagValue(plc *PLC, tag *Tag, value interface{}) {
-	// Criar dados de valor
-	data := map[string]interface{}{
-		"plc_id":    plc.ID,
-		"plc_nome":  plc.Nome,
-		"tag_id":    tag.ID,
-		"tag_nome":  tag.Nome,
-		"valor":     value,
-		"timestamp": tag.UltimaLeitura,
+	// Manter publicação no Redis para compatibilidade
+	if m.redisClient != nil {
+		// Criar dados de valor
+		data := map[string]interface{}{
+			"plc_id":    plc.ID,
+			"plc_nome":  plc.Nome,
+			"tag_id":    tag.ID,
+			"tag_nome":  tag.Nome,
+			"valor":     value,
+			"timestamp": tag.UltimaLeitura,
+		}
+
+		// Converter para JSON
+		dataJSON, err := json.Marshal(data)
+		if err != nil {
+			log.Printf("Falha ao serializar valor da tag: %v", err)
+			return
+		}
+
+		// Publicar no Redis
+		redisKey := fmt.Sprintf("plc:%d:tag:%d", plc.ID, tag.ID)
+		err = m.redisClient.Set(redisKey, string(dataJSON))
+		if err != nil {
+			log.Printf("Falha ao definir valor da tag no Redis: %v", err)
+		}
+
+		// Também publicar em um canal para assinantes
+		channelName := fmt.Sprintf("plc:%d:tag:%d:updates", plc.ID, tag.ID)
+		err = m.redisClient.Publish(channelName, string(dataJSON))
+		if err != nil {
+			log.Printf("Falha ao publicar valor da tag no canal Redis: %v", err)
+		}
 	}
 
-	// Converter para JSON
-	dataJSON, err := json.Marshal(data)
-	if err != nil {
-		log.Printf("Falha ao serializar valor da tag: %v", err)
-		return
-	}
-
-	// Publicar no Redis
-	redisKey := fmt.Sprintf("plc:%d:tag:%d", plc.ID, tag.ID)
-	err = m.redisClient.Set(redisKey, string(dataJSON))
-	if err != nil {
-		log.Printf("Falha ao definir valor da tag no Redis: %v", err)
-	}
-
-	// Também publicar em um canal para assinantes
-	channelName := fmt.Sprintf("plc:%d:tag:%d:updates", plc.ID, tag.ID)
-	err = m.redisClient.Publish(channelName, string(dataJSON))
-	if err != nil {
-		log.Printf("Falha ao publicar valor da tag no canal Redis: %v", err)
-	}
+	// Nota: A publicação NATS é feita diretamente no método readTag
 }
 
 // Stop para todas as conexões PLC e coleta de dados
@@ -425,7 +437,10 @@ func (m *Manager) Stop() {
 	close(m.stopChan)
 	m.wg.Wait()
 
-	m.wsHub.Stop()
+	// Fechar conexão NATS
+	if m.natsClient != nil {
+		m.natsClient.Close()
+	}
 
 	log.Println("Gerenciador PLC parado")
 }
@@ -630,8 +645,15 @@ func (m *Manager) WriteTag(plcID uint, tagID uint, value interface{}) error {
 	tagToWrite.UltimoValor = value
 	tagToWrite.UltimaLeitura = time.Now()
 
-	// Publicar o novo valor
+	// Publicar o novo valor no Redis (compatibilidade)
 	m.publishTagValue(plc, tagToWrite, value)
+
+	// Publicar no NATS
+	if m.natsClient != nil && m.natsClient.IsConnected() {
+		if err := m.natsClient.PublishTagValue(plc, tagToWrite, value); err != nil {
+			log.Printf("Falha ao publicar valor escrito da tag no NATS: %v", err)
+		}
+	}
 
 	return nil
 }
