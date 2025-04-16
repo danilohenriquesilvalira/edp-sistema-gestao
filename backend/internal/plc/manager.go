@@ -218,8 +218,13 @@ func (m *Manager) startPLC(plc *PLC) {
 	// Criar um stopChan para este PLC
 	plcStopChan := make(chan struct{})
 
+	// Criar um WaitGroup para as goroutines específicas deste PLC
+	var plcWg sync.WaitGroup
+
 	// Escutar pelo sinal global de parada
+	plcWg.Add(1)
 	go func() {
+		defer plcWg.Done()
 		select {
 		case <-m.stopChan:
 			close(plcStopChan)
@@ -232,7 +237,10 @@ func (m *Manager) startPLC(plc *PLC) {
 		case <-plcStopChan:
 			client.Disconnect()
 
-			// Novo: Parar monitoramento de falhas
+			// Esperar todas as goroutines do PLC terminarem
+			plcWg.Wait()
+
+			// Parar monitoramento de falhas
 			if m.faultManager != nil {
 				m.faultManager.StopMonitoring(plc.ID)
 			}
@@ -241,7 +249,8 @@ func (m *Manager) startPLC(plc *PLC) {
 		default:
 			err := client.Connect()
 			if err != nil {
-				log.Printf("Falha ao conectar com PLC %s: %v. Tentando novamente em 5s...", plc.Nome, err)
+				log.Printf("Falha ao conectar com PLC %s: %v. Tentando novamente em %v...",
+					plc.Nome, err, Config.ConnectionRetryDelay)
 				plc.Conectado = false
 				plc.UltimoErro = err.Error()
 
@@ -249,7 +258,7 @@ func (m *Manager) startPLC(plc *PLC) {
 				m.publishPLCStatus(plc)
 
 				// Esperar antes de tentar novamente
-				time.Sleep(5 * time.Second)
+				time.Sleep(Config.ConnectionRetryDelay)
 				continue
 			}
 
@@ -262,60 +271,67 @@ func (m *Manager) startPLC(plc *PLC) {
 
 			// Iniciar leitores de tag
 			tagStopChans := make([]chan struct{}, len(plc.Tags))
+
 			for i := range plc.Tags {
 				tagStopChans[i] = make(chan struct{})
 				m.wg.Add(1)
-				go m.readTag(plc, &plc.Tags[i], tagStopChans[i])
+				plcWg.Add(1)
+
+				// Capturar as variáveis no loop para evitar problemas de closure
+				tagIndex := i
+				tagChan := tagStopChans[i]
+
+				go func() {
+					defer plcWg.Done()
+					m.readTag(plc, &plc.Tags[tagIndex], tagChan)
+				}()
 			}
 
-			// Novo: Iniciar monitoramento de falhas
+			// Iniciar monitoramento de falhas
 			if m.faultManager != nil {
 				m.faultManager.StartMonitoring(plc)
 			}
 
 			// Monitorar conexão
-			for {
+			disconnected := false
+
+			for !disconnected {
 				select {
 				case <-plcStopChan:
 					// Fechar todos os canais de parada de tag
 					for _, ch := range tagStopChans {
 						close(ch)
 					}
+
 					client.Disconnect()
 
-					// Novo: Parar monitoramento de falhas
+					// Parar monitoramento de falhas
 					if m.faultManager != nil {
 						m.faultManager.StopMonitoring(plc.ID)
 					}
 
 					return
-				case <-time.After(30 * time.Second):
+
+				case <-time.After(Config.ConnectionCheckPeriod):
 					// Verificação periódica de conexão
 					if !client.IsConnected() {
 						log.Printf("Perdeu conexão com PLC %s. Reconectando...", plc.Nome)
 						plc.Conectado = false
+						disconnected = true
 
 						// Fechar todos os canais de parada de tag
 						for _, ch := range tagStopChans {
 							close(ch)
 						}
 
-						// Novo: Parar monitoramento de falhas
+						// Parar monitoramento de falhas
 						if m.faultManager != nil {
 							m.faultManager.StopMonitoring(plc.ID)
 						}
 
 						// Publicar status de conexão
 						m.publishPLCStatus(plc)
-
-						// Sair deste loop para reconectar
-						break
 					}
-				}
-
-				// Se saímos do select devido à perda de conexão, também saímos do loop for
-				if !plc.Conectado {
-					break
 				}
 			}
 		}
@@ -326,10 +342,19 @@ func (m *Manager) startPLC(plc *PLC) {
 func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 	defer m.wg.Done()
 
-	ticker := time.NewTicker(time.Duration(tag.UpdateInterval) * time.Millisecond)
+	interval := time.Duration(tag.UpdateInterval) * time.Millisecond
+	if interval < 10*time.Millisecond {
+		interval = Config.DefaultTagInterval // Usar valor padrão se intervalo for muito pequeno
+	}
+
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s7Client := plc.Client.(*S7Client)
+	s7Client, ok := plc.Client.(*S7Client)
+	if !ok {
+		log.Printf("Erro: Cliente S7 inválido para PLC %s (ID: %d)", plc.Nome, plc.ID)
+		return
+	}
 
 	for {
 		select {
@@ -347,7 +372,7 @@ func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 			if err != nil {
 				tag.UltimoErro = err.Error()
 				tag.UltimoErroTime = time.Now()
-				fmt.Printf("\033[31m[ERRO] PLC %s - Tag %s: %v\033[0m\n", plc.Nome, tag.Nome, err)
+				log.Printf("\033[31m[ERRO] PLC %s - Tag %s: %v\033[0m\n", plc.Nome, tag.Nome, err)
 				continue
 			}
 
@@ -358,47 +383,44 @@ func (m *Manager) readTag(plc *PLC, tag *Tag, stopChan chan struct{}) {
 			if !tag.OnlyOnChange || valueChanged {
 				tag.UltimoValor = value
 
-				// Apresentar o valor no terminal de forma clara
-				// Usar cores para melhor visualização
-				tagInfo := ""
-				if tag.Subsistema != nil {
-					tagInfo = fmt.Sprintf("%s.", *tag.Subsistema)
-				}
+				// Log com cores para console
+				logTagValue(plc, tag, value)
 
-				// Cor para valores diferentes tipos
-				var valueStr string
-				switch v := value.(type) {
-				case bool:
-					if v {
-						valueStr = fmt.Sprintf("\033[32m%v\033[0m", v) // Verde para true
-					} else {
-						valueStr = fmt.Sprintf("\033[31m%v\033[0m", v) // Vermelho para false
-					}
-				case float32, float64:
-					valueStr = fmt.Sprintf("\033[36m%.2f\033[0m", v) // Ciano para floats
-				case int, int16, int32, int64, uint, uint16, uint32, uint64:
-					valueStr = fmt.Sprintf("\033[33m%v\033[0m", v) // Amarelo para inteiros
-				case string:
-					valueStr = fmt.Sprintf("\033[35m\"%s\"\033[0m", v) // Roxo para strings
-				default:
-					valueStr = fmt.Sprintf("%v", v)
-				}
-
-				fmt.Printf("\033[1m[PLC]\033[0m \033[34m%s\033[0m - \033[36m%s%s\033[0m: %s\n",
-					plc.Nome, tagInfo, tag.Nome, valueStr)
-
-				// Publicar no Redis (mantido para compatibilidade)
+				// Publicação só depois de definir o valor para garantir consistência
 				m.publishTagValue(plc, tag, value)
-
-				// Publicar no NATS
-				if m.natsClient != nil && m.natsClient.IsConnected() {
-					if err := m.natsClient.PublishTagValue(plc, tag, value); err != nil {
-						log.Printf("Falha ao publicar valor da tag no NATS: %v", err)
-					}
-				}
 			}
 		}
 	}
+}
+
+// logTagValue loga o valor de uma tag com formatação colorida
+func logTagValue(plc *PLC, tag *Tag, value interface{}) {
+	tagInfo := ""
+	if tag.Subsistema != nil {
+		tagInfo = fmt.Sprintf("%s.", *tag.Subsistema)
+	}
+
+	// Cor para valores diferentes tipos
+	var valueStr string
+	switch v := value.(type) {
+	case bool:
+		if v {
+			valueStr = fmt.Sprintf("\033[32m%v\033[0m", v) // Verde para true
+		} else {
+			valueStr = fmt.Sprintf("\033[31m%v\033[0m", v) // Vermelho para false
+		}
+	case float32, float64:
+		valueStr = fmt.Sprintf("\033[36m%.2f\033[0m", v) // Ciano para floats
+	case int, int16, int32, int64, uint, uint16, uint32, uint64:
+		valueStr = fmt.Sprintf("\033[33m%v\033[0m", v) // Amarelo para inteiros
+	case string:
+		valueStr = fmt.Sprintf("\033[35m\"%s\"\033[0m", v) // Roxo para strings
+	default:
+		valueStr = fmt.Sprintf("%v", v)
+	}
+
+	fmt.Printf("\033[1m[PLC]\033[0m \033[34m%s\033[0m - \033[36m%s%s\033[0m: %s\n",
+		plc.Nome, tagInfo, tag.Nome, valueStr)
 }
 
 // publishPLCStatus publica o status de conexão do PLC via NATS e Redis
@@ -473,7 +495,12 @@ func (m *Manager) publishTagValue(plc *PLC, tag *Tag, value interface{}) {
 		}
 	}
 
-	// Nota: A publicação NATS é feita diretamente no método readTag
+	// Publicar no NATS
+	if m.natsClient != nil && m.natsClient.IsConnected() {
+		if err := m.natsClient.PublishTagValue(plc, tag, value); err != nil {
+			log.Printf("Falha ao publicar valor da tag no NATS: %v", err)
+		}
+	}
 }
 
 // Stop para todas as conexões PLC e coleta de dados

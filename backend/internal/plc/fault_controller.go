@@ -2,6 +2,7 @@ package plc
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -26,8 +27,23 @@ func NewFaultController(manager *Manager, faultManager *FaultManager) *FaultCont
 
 // GetAllFaultDefinitions retorna todas as definições de falhas
 func (c *FaultController) GetAllFaultDefinitions(ctx *fiber.Ctx) error {
-	var definitions []FaultDefinition
+	// Parâmetros de paginação
+	page, _ := strconv.Atoi(ctx.Query("page", "1"))
+	if page < 1 {
+		page = 1
+	}
 
+	pageSize, _ := strconv.Atoi(ctx.Query("page_size", fmt.Sprintf("%d", Config.DefaultPageSize)))
+	if pageSize < 1 {
+		pageSize = Config.DefaultPageSize
+	}
+	if pageSize > Config.MaxPageSize {
+		pageSize = Config.MaxPageSize
+	}
+
+	offset := (page - 1) * pageSize
+
+	// Construir a consulta base
 	query := config.DB.Order("eclusa, subsistema, word_name, bit_offset")
 
 	// Aplicar filtros se fornecidos
@@ -48,7 +64,13 @@ func (c *FaultController) GetAllFaultDefinitions(ctx *fiber.Ctx) error {
 		query = query.Where("ativo = ?", isAtivo)
 	}
 
-	result := query.Find(&definitions)
+	// Contar total de registros antes de aplicar paginação
+	var total int64
+	query.Model(&FaultDefinition{}).Count(&total)
+
+	// Aplicar paginação
+	var definitions []FaultDefinition
+	result := query.Limit(pageSize).Offset(offset).Find(&definitions)
 	if result.Error != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"sucesso":  false,
@@ -60,7 +82,9 @@ func (c *FaultController) GetAllFaultDefinitions(ctx *fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso": true,
 		"dados":   definitions,
-		"total":   len(definitions),
+		"total":   total,
+		"page":    page,
+		"pages":   int(math.Ceil(float64(total) / float64(pageSize))),
 	})
 }
 
@@ -367,6 +391,22 @@ func (c *FaultController) GetActiveFaults(ctx *fiber.Ctx) error {
 
 // GetFaultHistory retorna o histórico de falhas com filtragem
 func (c *FaultController) GetFaultHistory(ctx *fiber.Ctx) error {
+	// Parâmetros de paginação
+	page, _ := strconv.Atoi(ctx.Query("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	pageSize, _ := strconv.Atoi(ctx.Query("page_size", fmt.Sprintf("%d", Config.DefaultPageSize)))
+	if pageSize < 1 {
+		pageSize = Config.DefaultPageSize
+	}
+	if pageSize > Config.MaxPageSize {
+		pageSize = Config.MaxPageSize
+	}
+
+	offset := (page - 1) * pageSize
+
 	// Extrair parâmetros de filtragem
 	eclusa := ctx.Query("eclusa")
 	subsistema := ctx.Query("subsistema")
@@ -386,7 +426,35 @@ func (c *FaultController) GetFaultHistory(ctx *fiber.Ctx) error {
 		}
 	}
 
-	history, err := c.faultManager.GetFaultHistory(eclusa, subsistema, startTime, endTime)
+	// Construir a consulta base
+	query := config.DB.Table("fault_history").
+		Joins("JOIN fault_definitions ON fault_history.fault_id = fault_definitions.id")
+
+	// Aplicar filtros
+	if eclusa != "" {
+		query = query.Where("fault_definitions.eclusa = ?", eclusa)
+	}
+	if subsistema != "" {
+		query = query.Where("fault_definitions.subsistema = ?", subsistema)
+	}
+	if !startTime.IsZero() {
+		query = query.Where("fault_history.fim_timestamp >= ?", startTime)
+	}
+	if !endTime.IsZero() {
+		query = query.Where("fault_history.inicio_timestamp <= ?", endTime)
+	}
+
+	// Contar total antes de paginação
+	var total int64
+	query.Count(&total)
+
+	// Consulta paginada
+	var history []FaultHistory
+	err := query.Order("fault_history.inicio_timestamp DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&history).Error
+
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"sucesso":  false,
@@ -398,7 +466,9 @@ func (c *FaultController) GetFaultHistory(ctx *fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"sucesso": true,
 		"dados":   history,
-		"total":   len(history),
+		"total":   total,
+		"page":    page,
+		"pages":   int(math.Ceil(float64(total) / float64(pageSize))),
 	})
 }
 

@@ -203,7 +203,7 @@ func (fm *FaultManager) monitorDBWords(plc *PLC, dbNumber int, monitors []*WordM
 		return
 	}
 
-	ticker := time.NewTicker(1 * time.Second) // Taxa de amostragem adequada
+	ticker := time.NewTicker(Config.MonitorInterval)
 	defer ticker.Stop()
 
 	log.Printf("Iniciando monitoramento do DB %d no PLC %s", dbNumber, plc.Nome)
@@ -243,12 +243,18 @@ func (fm *FaultManager) monitorDBWords(plc *PLC, dbNumber int, monitors []*WordM
 					continue // Tipo inválido
 				}
 
-				// Verificar se o valor mudou
-				monitor.mutex.Lock()
+				// Verificar se o valor mudou - usando trava apenas para leitura inicial
+				monitor.mutex.RLock()
 				oldValue := monitor.LastValue
-				if newValue != oldValue {
-					// Valor mudou - atualizar e enviar para processamento
+				valueChanged := newValue != oldValue
+				monitor.mutex.RUnlock()
+
+				// Se valor mudou, atualizar e enviar para processamento
+				if valueChanged {
+					// Trava apenas para atualização do valor - operação rápida
+					monitor.mutex.Lock()
 					monitor.LastValue = newValue
+					monitor.mutex.Unlock()
 
 					key := fmt.Sprintf("%d:%d:%d", monitor.PLCID, monitor.DBNumber, monitor.ByteOffset)
 					change := WordValueChange{
@@ -269,7 +275,6 @@ func (fm *FaultManager) monitorDBWords(plc *PLC, dbNumber int, monitors []*WordM
 						log.Printf("AVISO: Canal de processamento cheio - descartando atualização para %s", key)
 					}
 				}
-				monitor.mutex.Unlock()
 			}
 		}
 	}
@@ -280,8 +285,8 @@ func (fm *FaultManager) processBatchUpdates() {
 	log.Println("Iniciando processador de lotes de atualizações de falhas")
 
 	batchSize := 0
-	pendingChanges := make([]WordValueChange, 0, 100)
-	ticker := time.NewTicker(200 * time.Millisecond)
+	pendingChanges := make([]WordValueChange, 0, Config.BatchMaxSize*2)
+	ticker := time.NewTicker(Config.BatchProcessPeriod)
 
 	for {
 		select {
@@ -291,8 +296,13 @@ func (fm *FaultManager) processBatchUpdates() {
 			batchSize++
 
 			// Processar imediatamente se o tamanho do lote atingir o limite
-			if batchSize >= 50 {
-				fm.processChangeBatch(pendingChanges)
+			if batchSize >= Config.BatchMaxSize {
+				changes := make([]WordValueChange, len(pendingChanges))
+				copy(changes, pendingChanges)
+
+				// Processamento em goroutine para não bloquear o canal
+				go fm.processChangeBatch(changes)
+
 				pendingChanges = pendingChanges[:0] // Limpar slice mantendo capacidade
 				batchSize = 0
 			}
@@ -300,7 +310,11 @@ func (fm *FaultManager) processBatchUpdates() {
 		case <-ticker.C:
 			// Processar lote atual periodicamente mesmo se pequeno
 			if batchSize > 0 {
-				fm.processChangeBatch(pendingChanges)
+				changes := make([]WordValueChange, len(pendingChanges))
+				copy(changes, pendingChanges)
+
+				go fm.processChangeBatch(changes)
+
 				pendingChanges = pendingChanges[:0]
 				batchSize = 0
 			}

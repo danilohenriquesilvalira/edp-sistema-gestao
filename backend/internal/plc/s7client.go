@@ -40,6 +40,10 @@ func NewS7Client(plc *PLC) (*S7Client, error) {
 
 // Connect estabelece uma conexão com o CLP
 func (s *S7Client) Connect() error {
+	// Usar o timeout da configuração
+	s.handler.Timeout = Config.ConnectionTimeout
+	s.handler.IdleTimeout = Config.ConnectionTimeout * 2
+
 	err := s.handler.Connect()
 	if err != nil {
 		s.conectado = false
